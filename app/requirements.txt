@@ -1,0 +1,10 @@
+pandas>=2.2
+numpy>=2.1
+pyarrow>=18.0
+requests>=2.32
+beautifulsoup4>=4.12
+lxml>=5.3
+pydantic>=2.10
+python-dotenv>=1.0
+loguru>=0.7
+tqdm>=4.67
