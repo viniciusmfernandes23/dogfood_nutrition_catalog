@@ -84,7 +84,7 @@ def run_extraction():
         df = pd.DataFrame(product_list)
         
         # 2. Coleta de Níveis de Garantia (Crawler)
-        full_df = df.head(50).copy()
+        full_df = df.copy()
         if 'raw_guarantee' not in full_df.columns:
             print(f"Extraindo níveis de garantia...")
             crawler = CobasiCrawler()
