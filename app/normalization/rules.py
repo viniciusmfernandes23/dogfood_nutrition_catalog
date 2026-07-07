@@ -26,11 +26,16 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     # Macronutrientes
     # ------------------------------------------------------
 
+    # NOTA DE PROJETO: Os valores extraídos pelo parser seguem uma escala de 10x 
+    # para preservar uma casa decimal em formato inteiro (ex: 26.0% vira 260).
+    # As regras abaixo foram ajustadas para que a normalização converta esses 
+    # valores para a unidade física real (g/kg ou mg/kg) sem o fator 10x.
+
     "protein_gkg": NormalizationRule(
         field="protein_gkg",
         target_min=60,
         target_max=600,
-        overscale_factor=10,
+        overscale_factor=1, # Removido fator 10x pois o valor já deve estar em g/kg
         percent_factor=PERCENT_TO_GKG_FACTOR,
     ),
 
@@ -38,7 +43,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         field="fat_gkg",
         target_min=20,
         target_max=400,
-        overscale_factor=10,
+        overscale_factor=1, # Removido fator 10x
         percent_factor=PERCENT_TO_GKG_FACTOR,
     ),
 
@@ -46,7 +51,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         field="fiber_gkg",
         target_min=5,
         target_max=250,
-        overscale_factor=100,
+        overscale_factor=1,
         percent_factor=PERCENT_TO_GKG_FACTOR,
     ),
 
@@ -54,7 +59,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         field="ash_gkg",
         target_min=10,
         target_max=200,
-        overscale_factor=100,
+        overscale_factor=1,
         percent_factor=PERCENT_TO_GKG_FACTOR,
     ),
 
@@ -73,7 +78,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         field="calcium_min_mgkg",
         target_min=1500,
         target_max=50000,
-        overscale_factor=10,
+        overscale_factor=1,
         decimal_shift_factor=100,
         percent_factor=PERCENT_TO_MGKG_FACTOR,
         gkg_to_mgkg=True,
@@ -83,7 +88,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         field="calcium_max_mgkg",
         target_min=1500,
         target_max=50000,
-        overscale_factor=10,
+        overscale_factor=1,
         decimal_shift_factor=100,
         percent_factor=PERCENT_TO_MGKG_FACTOR,
         gkg_to_mgkg=True,
@@ -93,7 +98,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         field="phosphorus_mgkg",
         target_min=1000,
         target_max=30000,
-        overscale_factor=10,
+        overscale_factor=1,
         percent_factor=PERCENT_TO_MGKG_FACTOR,
         gkg_to_mgkg=True,
     ),
@@ -102,7 +107,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         field="sodium_mgkg",
         target_min=800,
         target_max=20000,
-        overscale_factor=10,
+        overscale_factor=1,
         percent_factor=PERCENT_TO_MGKG_FACTOR,
         gkg_to_mgkg=True,
     ),
@@ -111,7 +116,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         field="potassium_mgkg",
         target_min=1500,
         target_max=50000,
-        overscale_factor=10,
+        overscale_factor=1,
         percent_factor=PERCENT_TO_MGKG_FACTOR,
         gkg_to_mgkg=True,
     ),

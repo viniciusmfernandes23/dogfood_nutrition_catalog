@@ -18,11 +18,26 @@ def format_currency(value):
     """Formata valor para padrão de moeda brasileira amigável ao Power BI."""
     if value is None or pd.isna(value):
         return None
-    # O Power BI lê melhor números com vírgula se a localidade for Brasil, 
-    # mas para exportação CSV universal, o ideal é manter o número 
-    # e deixar o Power BI formatar. 
-    # No entanto, o usuário pediu especificamente o formato R$.
-    return f"R$ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    # O Power BI interpreta o ponto como separador de milhar se houver vírgula.
+    # Se o valor for 57.27, f"{value:,.2f}" gera "57.27".
+    # O replace(".", ",") gera "57,27".
+    # Se o valor fosse 1500.50, f"{value:,.2f}" gera "1,500.50".
+    # O replace(",", "X").replace(".", ",").replace("X", ".") gera "1.500,50".
+    # Para evitar que "57,27" seja lido como "5.727", garantimos que não haja pontos se não houver milhar.
+    formatted = f"{value:,.2f}"
+    if value < 1000:
+        return f"R$ {formatted.replace('.', ',')}"
+    return f"R$ {formatted.replace(',', 'X').replace('.', ',').replace('X', '.')}"
+
+def fix_nutrient_scale(value):
+    """
+    Corrige a escala de 10x aplicada aos nutrientes para preservar decimais em inteiros.
+    Como o projeto optou por armazenar valores multiplicados por 10 (ex: 26.0% vira 260 g/kg),
+    esta função divide por 10 para retornar ao valor real.
+    """
+    if value is None or pd.isna(value):
+        return None
+    return float(value) / 10.0
 
 def run_extraction():
     print("Iniciando coleta de dados...")
@@ -118,7 +133,11 @@ def run_extraction():
             for nut_key, nut_data in nutrients.items():
                 target_col = mapping.get(nut_key)
                 if target_col:
-                    full_df.at[index, target_col] = nut_data['value']
+                    # Correção de Escala: O parser retorna valores multiplicados por 10 (ex: 26.0 vira 260).
+                    # Para que o orchestrator normalize corretamente, passamos o valor real (dividido por 10).
+                    val_real = fix_nutrient_scale(nut_data['value'])
+                    
+                    full_df.at[index, target_col] = val_real
                     full_df.at[index, f"{nut_key}_unit"] = nut_data['unit']
         
         # 4. Executar o Orquestrador
@@ -146,6 +165,10 @@ def run_extraction():
                     # Mas para atender o pedido, vamos formatar as colunas de preço
                     for col in ['price', 'price_per_kg', 'subscriber_price']:
                         if col in temp_df.columns:
+                            # O Power BI interpreta o ponto como separador de milhar se houver vírgula,
+                            # o que causou o erro de R$ 57,27 virar R$ 5.727.
+                            # Para exportação CSV, o ideal é manter o número puro e deixar o Power BI formatar,
+                            # ou garantir que a string não seja ambígua.
                             temp_df[col] = temp_df[col].apply(format_currency)
                     temp_df.to_csv(dest_path, index=False, encoding="utf-8-sig")
                 else:
