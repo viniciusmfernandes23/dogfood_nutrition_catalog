@@ -59,7 +59,7 @@ def parse_value(
 
 
 def parse_nutrition(
-    raw_text: str | None,
+    raw_text: Any,
 ) -> dict[str, dict[str, Any]]:
     """
     Extrai todos os nutrientes encontrados na seção
@@ -77,7 +77,9 @@ def parse_nutrition(
     }
     """
 
-    if not raw_text:
+    # O pandas pode passar NaN (float) para esta função.
+    # Verificamos se é uma string válida antes de processar.
+    if not isinstance(raw_text, str) or not raw_text.strip():
         return {}
 
     text = raw_text.lower()
