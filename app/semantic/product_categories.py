@@ -1,60 +1,92 @@
-PRODUCT_RULES = {
+from __future__ import annotations
 
-    "Ração Seca": [
+from types import MappingProxyType
+
+PRODUCT_RULES = MappingProxyType({
+
+    "Ração Seca": (
 
         "ração seca",
 
         "extrusada",
 
-    ],
+        "extrusado",
 
-    "Ração Úmida": [
+        "dry food",
+
+        "dry",
+
+    ),
+
+    "Ração Úmida": (
 
         "ração úmida",
 
+        "úmida",
+
         "sachê",
+
+        "sache",
 
         "patê",
 
+        "pate",
+
         "lata",
 
-    ],
+        "wet food",
 
-    "Ração Clínica": [
+    ),
+
+    "Ração Clínica": (
 
         "clinical",
 
         "prescription",
 
-    ],
+        "prescription diet",
 
-    "Ração Veterinária": [
+        "prescription food",
+
+    ),
+
+    "Ração Veterinária": (
 
         "veterinária",
 
+        "veterinario",
+
         "veterinary",
 
-    ],
+        "vet diet",
 
-    "Ração Natural": [
+    ),
+
+    "Ração Natural": (
 
         "natural",
 
-    ],
+        "naturalis",
 
-    "Premium": [
+        "natural food",
+
+    ),
+
+    "Premium": (
 
         "premium",
 
-    ],
+    ),
 
-    "Super Premium": [
+    "Super Premium": (
 
         "super premium",
 
-    ],
+        "superpremium",
 
-    "Petisco": [
+    ),
+
+    "Petisco": (
 
         "petisco",
 
@@ -62,32 +94,89 @@ PRODUCT_RULES = {
 
         "bifinho",
 
-    ],
+        "biscuit",
 
-    "Suplemento": [
+        "cookie",
+
+        "osso",
+
+        "bone",
+
+        "treat",
+
+    ),
+
+    "Suplemento": (
 
         "suplemento",
 
+        "suplementação",
+
         "vitamínico",
 
-    ],
+        "vitaminico",
 
-    "Funcional": [
+        "suplement",
+
+    ),
+
+    "Funcional": (
 
         "funcional",
 
-    ],
+        "functional",
 
-    "Terapêutica": [
+    ),
+
+    "Terapêutica": (
 
         "renal",
 
         "hepatic",
 
+        "hepático",
+
+        "hepatico",
+
         "urinary",
+
+        "urinário",
+
+        "urinario",
 
         "diabetic",
 
-    ],
+        "diabético",
 
-}
+        "diabetico",
+
+        "gastrointestinal",
+
+        "obesity",
+
+        "obesidade",
+
+        "hypoallergenic",
+
+        "hipoalergênica",
+
+        "hipoalergenica",
+
+        "cardiac",
+
+        "cardíaca",
+
+        "cardiaca",
+
+        "mobility",
+
+        "joint",
+
+        "articular",
+
+    ),
+
+})
+
+
+PRODUCT_CATEGORIES = tuple(PRODUCT_RULES.keys())

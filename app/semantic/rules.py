@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import MappingProxyType
+
 from app.semantic.categories import (
     BreedSize,
     ClinicalCategory,
@@ -13,38 +15,45 @@ from app.semantic.categories import (
 # Produto
 # ==========================================================
 
-PRODUCT_CATEGORY_RULES: dict[ProductCategory, tuple[str, ...]] = {
+PRODUCT_CATEGORY_RULES = MappingProxyType({
 
     ProductCategory.DRY: (
         "ração seca",
-        "ração para cães",
-        "ração cachorro",
+        "extrusada",
+        "extrusado",
+        "dry food",
     ),
 
     ProductCategory.WET: (
         "ração úmida",
+        "úmida",
         "sachê",
-        "lata",
+        "sache",
         "patê",
+        "pate",
+        "lata",
+        "wet food",
     ),
 
     ProductCategory.CLINICAL: (
-        "prescrição",
-        "prescription",
         "clinical",
+        "prescription",
+        "prescription diet",
         "diet",
     ),
 
     ProductCategory.VETERINARY: (
         "veterinary",
         "veterinária",
-        "veterinary diet",
+        "veterinario",
+        "vet",
     ),
 
     ProductCategory.NATURAL: (
         "natural",
         "grain free",
         "holístico",
+        "holistico",
     ),
 
     ProductCategory.PREMIUM: (
@@ -53,40 +62,48 @@ PRODUCT_CATEGORY_RULES: dict[ProductCategory, tuple[str, ...]] = {
 
     ProductCategory.SUPER_PREMIUM: (
         "super premium",
+        "superpremium",
     ),
 
     ProductCategory.TREAT: (
         "petisco",
-        "bifinho",
         "snack",
-        "biscoito",
+        "bifinho",
         "cookie",
+        "biscoito",
+        "treat",
     ),
 
     ProductCategory.SUPPLEMENT: (
         "suplemento",
         "suplementação",
+        "suplementacao",
         "vitamínico",
+        "vitaminico",
     ),
 
     ProductCategory.FUNCTIONAL: (
         "funcional",
+        "functional",
     ),
 
     ProductCategory.THERAPEUTIC: (
         "terapêutica",
+        "terapeutica",
     ),
-}
+
+})
 
 # ==========================================================
 # Fase de Vida
 # ==========================================================
 
-LIFESTAGE_RULES: dict[LifeStage, tuple[str, ...]] = {
+LIFESTAGE_RULES = MappingProxyType({
 
     LifeStage.PUPPY: (
         "filhote",
         "puppy",
+        "junior",
         "júnior",
     ),
 
@@ -98,8 +115,8 @@ LIFESTAGE_RULES: dict[LifeStage, tuple[str, ...]] = {
     LifeStage.SENIOR: (
         "sênior",
         "senior",
-        "mature",
         "idoso",
+        "mature",
     ),
 
     LifeStage.ALL: (
@@ -107,13 +124,14 @@ LIFESTAGE_RULES: dict[LifeStage, tuple[str, ...]] = {
         "todas as idades",
         "all life stages",
     ),
-}
+
+})
 
 # ==========================================================
 # Porte
 # ==========================================================
 
-BREED_SIZE_RULES: dict[BreedSize, tuple[str, ...]] = {
+BREED_SIZE_RULES = MappingProxyType({
 
     BreedSize.MINI: (
         "mini",
@@ -123,16 +141,19 @@ BREED_SIZE_RULES: dict[BreedSize, tuple[str, ...]] = {
     BreedSize.SMALL: (
         "pequeno porte",
         "small",
+        "small breed",
     ),
 
     BreedSize.MEDIUM: (
         "médio porte",
+        "medio porte",
         "medium",
     ),
 
     BreedSize.LARGE: (
         "grande porte",
         "large",
+        "large breed",
     ),
 
     BreedSize.GIANT: (
@@ -143,14 +164,16 @@ BREED_SIZE_RULES: dict[BreedSize, tuple[str, ...]] = {
     BreedSize.ALL: (
         "todos os portes",
         "all breeds",
+        "all sizes",
     ),
-}
+
+})
 
 # ==========================================================
 # Categoria Clínica
 # ==========================================================
 
-CLINICAL_RULES: dict[ClinicalCategory, tuple[str, ...]] = {
+CLINICAL_RULES = MappingProxyType({
 
     ClinicalCategory.RENAL: (
         "renal",
@@ -160,13 +183,16 @@ CLINICAL_RULES: dict[ClinicalCategory, tuple[str, ...]] = {
     ClinicalCategory.HEPATIC: (
         "hepatic",
         "hepática",
+        "hepatica",
         "liver",
     ),
 
     ClinicalCategory.URINARY: (
         "urinary",
         "urinário",
+        "urinario",
         "trato urinário",
+        "trato urinario",
     ),
 
     ClinicalCategory.GASTROINTESTINAL: (
@@ -183,6 +209,7 @@ CLINICAL_RULES: dict[ClinicalCategory, tuple[str, ...]] = {
 
     ClinicalCategory.HYPOALLERGENIC: (
         "hipoalergênica",
+        "hipoalergenica",
         "hypoallergenic",
         "allergenic",
     ),
@@ -193,13 +220,14 @@ CLINICAL_RULES: dict[ClinicalCategory, tuple[str, ...]] = {
         "weight control",
         "controle de peso",
     ),
-}
+
+})
 
 # ==========================================================
 # Fonte de Proteína
 # ==========================================================
 
-PROTEIN_RULES: dict[ProteinSource, tuple[str, ...]] = {
+PROTEIN_RULES = MappingProxyType({
 
     ProteinSource.CHICKEN: (
         "frango",
@@ -208,6 +236,7 @@ PROTEIN_RULES: dict[ProteinSource, tuple[str, ...]] = {
 
     ProteinSource.BEEF: (
         "carne",
+        "carne bovina",
         "beef",
         "bovina",
     ),
@@ -219,11 +248,13 @@ PROTEIN_RULES: dict[ProteinSource, tuple[str, ...]] = {
 
     ProteinSource.SALMON: (
         "salmão",
+        "salmao",
         "salmon",
     ),
 
     ProteinSource.PORK: (
         "suíno",
+        "suino",
         "pork",
     ),
 
@@ -237,15 +268,17 @@ PROTEIN_RULES: dict[ProteinSource, tuple[str, ...]] = {
         "fish",
         "atum",
         "tilápia",
+        "tilapia",
         "truta",
     ),
-}
+
+})
 
 # ==========================================================
 # Nível do Produto
 # ==========================================================
 
-PRODUCT_TIER_RULES: dict[ProductTier, tuple[str, ...]] = {
+PRODUCT_TIER_RULES = MappingProxyType({
 
     ProductTier.ULTRA_PREMIUM: (
         "ultra premium",
@@ -253,6 +286,7 @@ PRODUCT_TIER_RULES: dict[ProductTier, tuple[str, ...]] = {
 
     ProductTier.SUPER_PREMIUM: (
         "super premium",
+        "superpremium",
     ),
 
     ProductTier.PREMIUM: (
@@ -268,14 +302,16 @@ PRODUCT_TIER_RULES: dict[ProductTier, tuple[str, ...]] = {
         "veterinary",
         "prescription",
         "veterinária",
+        "veterinario",
     ),
-}
+
+})
 
 # ==========================================================
-# Helpers
+# Registry
 # ==========================================================
 
-SEMANTIC_RULES = {
+SEMANTIC_RULES = MappingProxyType({
 
     "product_category": PRODUCT_CATEGORY_RULES,
 
@@ -289,4 +325,4 @@ SEMANTIC_RULES = {
 
     "product_tier": PRODUCT_TIER_RULES,
 
-}
+})

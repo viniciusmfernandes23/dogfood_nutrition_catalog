@@ -1,40 +1,59 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+import unicodedata
+from collections.abc import Mapping
 from enum import Enum
+from functools import lru_cache
 
 
 class SemanticClassifier:
     """
     Classificador semântico baseado em palavras-chave.
-
-    Funciona para qualquer domínio:
-
-    - Categoria do Produto
-    - Fase de Vida
-    - Porte
-    - Categoria Clínica
-    - Fonte de Proteína
-    - Nível do Produto
     """
 
     def __init__(
         self,
-        rules: dict[Enum, tuple[str, ...]],
+        rules: Mapping[Enum, tuple[str, ...]],
     ) -> None:
 
         self.rules = rules
 
+    # ==========================================================
+    # Normalização
+    # ==========================================================
+
     @staticmethod
+    @lru_cache(maxsize=4096)
     def normalize_text(
         text: str | None,
     ) -> str:
 
-        if text is None:
+        if not text:
             return ""
 
-        text = text.lower()
+        text = unicodedata.normalize(
+            "NFKD",
+            text.lower(),
+        )
+
+        text = "".join(
+
+            char
+
+            for char
+
+            in text
+
+            if not unicodedata.combining(char)
+
+        )
+
+        text = re.sub(
+            r"[^\w\s/-]",
+            " ",
+            text,
+        )
 
         text = re.sub(
             r"\s+",
@@ -45,29 +64,43 @@ class SemanticClassifier:
         return text.strip()
 
     @staticmethod
+    @lru_cache(maxsize=8192)
+    def _compile_pattern(
+        keyword: str,
+    ) -> re.Pattern[str]:
+
+        keyword = SemanticClassifier.normalize_text(
+            keyword,
+        )
+
+        return re.compile(
+            rf"\b{re.escape(keyword)}\b",
+            re.IGNORECASE,
+        )
+
+    @classmethod
     def contains_keyword(
+        cls,
         text: str,
         keyword: str,
     ) -> bool:
 
-        pattern = (
-            rf"\b{re.escape(keyword.lower())}\b"
+        return bool(
+
+            cls._compile_pattern(
+                keyword,
+            ).search(text)
+
         )
 
-        return bool(
-            re.search(
-                pattern,
-                text,
-            )
-        )
+    # ==========================================================
+    # Classificação
+    # ==========================================================
 
     def classify(
         self,
         text: str | None,
     ) -> Enum | None:
-        """
-        Retorna a primeira categoria encontrada.
-        """
 
         normalized = self.normalize_text(
             text,
@@ -75,14 +108,20 @@ class SemanticClassifier:
 
         for category, keywords in self.rules.items():
 
-            for keyword in keywords:
+            if any(
 
-                if self.contains_keyword(
+                self.contains_keyword(
                     normalized,
                     keyword,
-                ):
+                )
 
-                    return category
+                for keyword
+
+                in keywords
+
+            ):
+
+                return category
 
         return None
 
@@ -90,9 +129,6 @@ class SemanticClassifier:
         self,
         text: str | None,
     ) -> list[Enum]:
-        """
-        Retorna todas as categorias encontradas.
-        """
 
         normalized = self.normalize_text(
             text,
@@ -124,26 +160,26 @@ class SemanticClassifier:
         text: str | None,
     ) -> bool:
 
-        return self.classify(text) is not None
+        return self.classify(
+            text,
+        ) is not None
+
+    # ==========================================================
+    # Score
+    # ==========================================================
 
     def score(
         self,
         text: str | None,
     ) -> dict[Enum, int]:
-        """
-        Calcula um score baseado
-        no número de palavras-chave encontradas.
-        """
 
         normalized = self.normalize_text(
             text,
         )
 
-        scores: dict[Enum, int] = {}
+        return {
 
-        for category, keywords in self.rules.items():
-
-            score = sum(
+            category: sum(
 
                 self.contains_keyword(
                     normalized,
@@ -156,83 +192,101 @@ class SemanticClassifier:
 
             )
 
-            scores[category] = score
+            for category, keywords
 
-        return scores
+            in self.rules.items()
+
+        }
 
     def best_match(
         self,
         text: str | None,
     ) -> Enum | None:
-        """
-        Retorna a categoria
-        com maior score.
-        """
 
-        scores = self.score(text)
+        scores = self.score(
+            text,
+        )
 
         if not scores:
 
             return None
 
-        category = max(
+        best = max(
             scores,
             key=scores.get,
         )
 
-        if scores[category] == 0:
+        return (
 
-            return None
+            best
 
-        return category
+            if scores[best] > 0
+
+            else None
+
+        )
+
+    # ==========================================================
+    # Keywords
+    # ==========================================================
 
     def extract_keywords(
         self,
         text: str | None,
     ) -> list[str]:
-        """
-        Retorna todas as palavras-chave
-        encontradas no texto.
-        """
 
         normalized = self.normalize_text(
             text,
         )
 
-        found: list[str] = []
+        keywords = {
 
-        for keywords in self.rules.values():
+            keyword
 
-            for keyword in keywords:
+            for values
 
-                if self.contains_keyword(
-                    normalized,
-                    keyword,
-                ):
+            in self.rules.values()
 
-                    found.append(keyword)
+            for keyword
+
+            in values
+
+            if self.contains_keyword(
+                normalized,
+                keyword,
+            )
+
+        }
 
         return sorted(
-            set(found),
+            keywords,
         )
+
+    # ==========================================================
+    # Explain
+    # ==========================================================
 
     def explain(
         self,
         text: str | None,
     ) -> dict[str, object]:
-        """
-        Explica o processo
-        de classificação.
-        """
 
         return {
 
-            "match": self.best_match(text),
+            "best_match": self.best_match(
+                text,
+            ),
 
-            "matches": self.classify_many(text),
+            "matches": self.classify_many(
+                text,
+            ),
 
-            "keywords": self.extract_keywords(text),
+            "keywords": self.extract_keywords(
+                text,
+            ),
 
-            "scores": self.score(text),
+            "scores": self.score(
+                text,
+            ),
 
         }

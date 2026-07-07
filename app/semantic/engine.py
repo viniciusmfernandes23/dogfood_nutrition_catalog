@@ -3,10 +3,7 @@ from __future__ import annotations
 import pandas as pd
 
 from app.semantic.categories import (
-    BreedSize,
     ClinicalCategory,
-    LifeStage,
-    ProductCategory,
     ProductTier,
     ProteinSource,
 )
@@ -23,89 +20,144 @@ from app.semantic.rules import (
 
 class SemanticEngine:
     """
-    Responsável por enriquecer semanticamente
-    o catálogo de produtos.
+    Enriquecimento semântico do catálogo de produtos.
     """
+
+    OUTPUT_COLUMNS = (
+        "product_category",
+        "life_stage",
+        "breed_size",
+        "clinical_category",
+        "protein_source",
+        "product_tier",
+    )
+
+    TEXT_COLUMNS = (
+        "product_name",
+        "brand",
+        "description",
+        "category",
+        "ingredients",
+    )
 
     def __init__(self) -> None:
 
         self.product_classifier = SemanticClassifier(
-            PRODUCT_CATEGORY_RULES
+            PRODUCT_CATEGORY_RULES,
         )
 
         self.life_stage_classifier = SemanticClassifier(
-            LIFESTAGE_RULES
+            LIFESTAGE_RULES,
         )
 
         self.breed_classifier = SemanticClassifier(
-            BREED_SIZE_RULES
+            BREED_SIZE_RULES,
         )
 
         self.clinical_classifier = SemanticClassifier(
-            CLINICAL_RULES
+            CLINICAL_RULES,
         )
 
         self.protein_classifier = SemanticClassifier(
-            PROTEIN_RULES
+            PROTEIN_RULES,
         )
 
         self.tier_classifier = SemanticClassifier(
-            PRODUCT_TIER_RULES
+            PRODUCT_TIER_RULES,
+        )
+
+    # ==========================================================
+    # Helpers
+    # ==========================================================
+
+    @classmethod
+    def _build_text(
+        cls,
+        row: pd.Series,
+    ) -> str:
+
+        return " ".join(
+
+            str(
+                row.get(
+                    column,
+                    "",
+                )
+            )
+
+            for column
+
+            in cls.TEXT_COLUMNS
+
+            if pd.notna(
+                row.get(
+                    column,
+                )
+            )
+
         )
 
     @staticmethod
-    def _build_text(row: pd.Series) -> str:
+    def _enum_value(
+        value,
+        default: str | None = None,
+    ) -> str | None:
 
-        values = [
+        if value is None:
+            return default
 
-            str(row.get("product_name", "")),
+        return value.value
 
-            str(row.get("brand", "")),
-
-            str(row.get("description", "")),
-
-            str(row.get("category", "")),
-
-            str(row.get("ingredients", "")),
-
-        ]
-
-        return " ".join(values)
+    # ==========================================================
+    # Classificação
+    # ==========================================================
 
     def classify_product(
         self,
         row: pd.Series,
-    ) -> dict:
+    ) -> dict[str, object]:
 
-        text = self._build_text(row)
+        text = self._build_text(
+            row,
+        )
 
         return {
 
             "product_category":
-
-                self.product_classifier.best_match(text),
+                self.product_classifier.best_match(
+                    text,
+                ),
 
             "life_stage":
-
-                self.life_stage_classifier.best_match(text),
+                self.life_stage_classifier.best_match(
+                    text,
+                ),
 
             "breed_size":
-
-                self.breed_classifier.best_match(text),
+                self.breed_classifier.best_match(
+                    text,
+                ),
 
             "clinical_category":
-
-                self.clinical_classifier.best_match(text),
+                self.clinical_classifier.best_match(
+                    text,
+                ),
 
             "protein_source":
-
-                self.protein_classifier.classify_many(text),
+                self.protein_classifier.classify_many(
+                    text,
+                ),
 
             "product_tier":
-
-                self.tier_classifier.best_match(text),
+                self.tier_classifier.best_match(
+                    text,
+                ),
 
         }
+
+    # ==========================================================
+    # DataFrame
+    # ==========================================================
 
     def enrich_dataframe(
         self,
@@ -114,63 +166,50 @@ class SemanticEngine:
 
         df = df.copy()
 
-        df["product_category"] = None
-
-        df["life_stage"] = None
-
-        df["breed_size"] = None
-
-        df["clinical_category"] = None
-
-        df["protein_source"] = None
-
-        df["product_tier"] = None
+        for column in self.OUTPUT_COLUMNS:
+            if column not in df.columns:
+                df[column] = None
 
         for index, row in df.iterrows():
 
-            semantic = self.classify_product(row)
-
-            df.at[
-                index,
-                "product_category"
-            ] = (
-                semantic["product_category"].value
-                if semantic["product_category"]
-                else None
+            semantic = self.classify_product(
+                row,
             )
 
             df.at[
                 index,
-                "life_stage"
-            ] = (
-                semantic["life_stage"].value
-                if semantic["life_stage"]
-                else None
+                "product_category",
+            ] = self._enum_value(
+                semantic["product_category"],
             )
 
             df.at[
                 index,
-                "breed_size"
-            ] = (
-                semantic["breed_size"].value
-                if semantic["breed_size"]
-                else None
+                "life_stage",
+            ] = self._enum_value(
+                semantic["life_stage"],
             )
 
             df.at[
                 index,
-                "clinical_category"
-            ] = (
-                semantic["clinical_category"].value
-                if semantic["clinical_category"]
-                else ClinicalCategory.NONE.value
+                "breed_size",
+            ] = self._enum_value(
+                semantic["breed_size"],
+            )
+
+            df.at[
+                index,
+                "clinical_category",
+            ] = self._enum_value(
+                semantic["clinical_category"],
+                ClinicalCategory.NONE.value,
             )
 
             proteins = semantic["protein_source"]
 
             df.at[
                 index,
-                "protein_source"
+                "protein_source",
             ] = (
                 ", ".join(
                     protein.value
@@ -182,11 +221,10 @@ class SemanticEngine:
 
             df.at[
                 index,
-                "product_tier"
-            ] = (
-                semantic["product_tier"].value
-                if semantic["product_tier"]
-                else ProductTier.STANDARD.value
+                "product_tier",
+            ] = self._enum_value(
+                semantic["product_tier"],
+                ProductTier.STANDARD.value,
             )
 
         return df
