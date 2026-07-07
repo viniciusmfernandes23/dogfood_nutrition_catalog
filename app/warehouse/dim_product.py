@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pandas as pd
 
@@ -12,7 +12,7 @@ class ProductDimensionBuilder:
     Constrói a dimensão de produtos (dim_product).
     """
 
-    DEFAULT_COLUMNS = [
+    DEFAULT_COLUMNS = (
         "product_id",
         "sku",
         "brand",
@@ -29,21 +29,32 @@ class ProductDimensionBuilder:
         "clinical_category",
         "package_size",
         "package_unit",
-    ]
+    )
+
+    NUTRIENT_SUFFIXES = (
+        "_gkg",
+        "_mgkg",
+        "_uikg",
+    )
 
     def __init__(self) -> None:
-        self.timestamp = datetime.utcnow()
+
+        self.timestamp = datetime.now(
+            UTC,
+        )
 
     def build(
         self,
         dataframe: pd.DataFrame,
     ) -> pd.DataFrame:
 
-        records: list[dict] = []
+        if dataframe.empty:
 
-        for row in dataframe.to_dict(orient="records"):
+            return pd.DataFrame()
 
-            product = ProductDimension(
+        records = [
+
+            ProductDimension(
 
                 product_id=row.get("product_id"),
 
@@ -85,53 +96,60 @@ class ProductDimensionBuilder:
 
                 updated_at=self.timestamp,
 
+            ).to_dict()
+
+            for row
+
+            in dataframe.to_dict(
+                orient="records",
             )
-
-            records.append(
-                product.to_dict()
-            )
-
-        dim = pd.DataFrame(records)
-
-        dim = self._remove_duplicates(dim)
-
-        dim = self._sort(dim)
-
-        return dim
-
-    @staticmethod
-    def _has_guarantee_levels(
-        row: dict,
-    ) -> bool:
-
-        nutrient_columns = [
-
-            column
-
-            for column in row.keys()
-
-            if column.endswith("_gkg")
-            or column.endswith("_mgkg")
-            or column.endswith("_uikg")
 
         ]
 
-        for column in nutrient_columns:
+        dim = pd.DataFrame(
+            records,
+        )
 
-            value = row.get(column)
+        dim = self._remove_duplicates(
+            dim,
+        )
 
-            if pd.notna(value):
+        dim = self._sort(
+            dim,
+        )
 
-                return True
+        return dim
 
-        return False
+    @classmethod
+    def _has_guarantee_levels(
+        cls,
+        row: dict,
+    ) -> bool:
+
+        return any(
+
+            pd.notna(value)
+
+            for column, value
+
+            in row.items()
+
+            if column.endswith(
+                cls.NUTRIENT_SUFFIXES,
+            )
+
+        )
 
     @staticmethod
     def _remove_duplicates(
         dataframe: pd.DataFrame,
     ) -> pd.DataFrame:
 
-        if "product_id" not in dataframe.columns:
+        if (
+            dataframe.empty
+            or "product_id"
+            not in dataframe.columns
+        ):
 
             return dataframe
 
@@ -139,14 +157,14 @@ class ProductDimensionBuilder:
 
             dataframe
 
-            .sort_values("product_id")
-
             .drop_duplicates(
-                subset=["product_id"],
+                subset="product_id",
                 keep="last",
             )
 
-            .reset_index(drop=True)
+            .reset_index(
+                drop=True,
+            )
 
         )
 
@@ -155,14 +173,29 @@ class ProductDimensionBuilder:
         dataframe: pd.DataFrame,
     ) -> pd.DataFrame:
 
-        if "product_name" in dataframe.columns:
+        columns = [
+
+            column
+
+            for column
+
+            in (
+                "brand",
+                "product_name",
+            )
+
+            if column in dataframe.columns
+
+        ]
+
+        if columns:
 
             dataframe = dataframe.sort_values(
-                by=[
-                    "brand",
-                    "product_name",
-                ],
+
+                by=columns,
+
                 na_position="last",
+
             )
 
         return dataframe.reset_index(
@@ -176,7 +209,11 @@ class ProductDimensionBuilder:
     ) -> None:
 
         dataframe.to_csv(
+
             output_path,
+
             index=False,
+
             encoding="utf-8-sig",
+
         )

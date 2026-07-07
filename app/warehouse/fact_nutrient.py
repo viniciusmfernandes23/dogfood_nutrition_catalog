@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pandas as pd
 
@@ -9,118 +9,116 @@ from app.warehouse.models import NutrientFact
 
 class NutrientFactBuilder:
     """
-    Constrói a tabela fact_nutrient.
-
-    Cada linha representa um nutriente de um produto.
+    Constrói a tabela fato de nutrientes.
     """
 
-    NUTRIENT_COLUMNS = {
-        "protein_gkg": "protein",
-        "fat_gkg": "fat",
-        "fiber_gkg": "fiber",
-        "ash_gkg": "ash",
-        "moisture_gkg": "moisture",
-        "calcium_min_mgkg": "calcium_min",
-        "calcium_max_mgkg": "calcium_max",
-        "phosphorus_mgkg": "phosphorus",
-        "sodium_mgkg": "sodium",
-        "potassium_mgkg": "potassium",
-    }
+    NUTRIENT_COLUMNS = (
+        "protein_gkg",
+        "fat_gkg",
+        "fiber_gkg",
+        "ash_gkg",
+        "moisture_gkg",
+        "calcium_min_mgkg",
+        "calcium_max_mgkg",
+        "phosphorus_mgkg",
+        "sodium_mgkg",
+        "potassium_mgkg",
+    )
 
     def __init__(self) -> None:
-        self.snapshot_date = datetime.utcnow()
+
+        self.timestamp = datetime.now(
+            UTC,
+        )
 
     def build(
         self,
         dataframe: pd.DataFrame,
     ) -> pd.DataFrame:
 
-        facts: list[dict] = []
+        if dataframe.empty:
 
-        for row in dataframe.to_dict(orient="records"):
+            return pd.DataFrame()
 
-            product_id = row.get("product_id")
+        records: list[dict] = []
 
-            for column, nutrient in self.NUTRIENT_COLUMNS.items():
+        for row in dataframe.to_dict(
+            orient="records",
+        ):
 
-                if column not in row:
+            product_id = row.get(
+                "product_id",
+            )
+
+            for nutrient in self.NUTRIENT_COLUMNS:
+
+                if nutrient not in row:
                     continue
 
-                value = row.get(column)
+                value = row.get(
+                    nutrient,
+                )
 
                 if pd.isna(value):
                     continue
-
-                unit = self._infer_unit(column)
 
                 fact = NutrientFact(
 
                     product_id=product_id,
 
-                    nutrient=nutrient,
+                    nutrient_name=nutrient,
 
-                    value=float(value),
+                    nutrient_value=float(value),
 
-                    unit=unit,
-
-                    normalization_status=row.get(
-                        f"{column}_status"
-                    ),
-
-                    rule_applied=row.get(
-                        f"{column}_rule"
-                    ),
-
-                    confidence=row.get(
-                        f"{column}_confidence"
-                    ),
-
-                    snapshot_date=self.snapshot_date,
+                    collected_at=self.timestamp,
 
                 )
 
-                facts.append(
-                    fact.to_dict()
+                records.append(
+                    fact.to_dict(),
                 )
 
-        fact_df = pd.DataFrame(facts)
+        fact_df = pd.DataFrame(
+            records,
+        )
 
-        if not fact_df.empty:
-
-            fact_df = (
-
-                fact_df
-
-                .sort_values(
-                    by=[
-                        "product_id",
-                        "nutrient",
-                    ]
-                )
-
-                .reset_index(
-                    drop=True
-                )
-
-            )
-
-        return fact_df
+        return self._sort(
+            fact_df,
+        )
 
     @staticmethod
-    def _infer_unit(
-        column: str,
-    ) -> str:
+    def _sort(
+        dataframe: pd.DataFrame,
+    ) -> pd.DataFrame:
 
-        if column.endswith("_gkg"):
-            return "g/kg"
+        if dataframe.empty:
 
-        if column.endswith("_mgkg"):
-            return "mg/kg"
+            return dataframe
 
-        if column.endswith("_uikg"):
-            return "UI/kg"
+        columns = [
 
-        return ""
+            column
+
+            for column
+
+            in (
+                "product_id",
+                "nutrient_name",
+            )
+
+            if column in dataframe.columns
+
+        ]
+
+        if columns:
+
+            dataframe = dataframe.sort_values(
+                by=columns,
+            )
+
+        return dataframe.reset_index(
+            drop=True,
+        )
 
     @staticmethod
     def export_csv(
@@ -129,7 +127,11 @@ class NutrientFactBuilder:
     ) -> None:
 
         dataframe.to_csv(
+
             output_path,
+
             index=False,
+
             encoding="utf-8-sig",
+
         )

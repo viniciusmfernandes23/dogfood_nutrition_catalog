@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pandas as pd
 
-from app.semantic.engine import SemanticEngine
 from app.warehouse.dim_product import ProductDimensionBuilder
 from app.warehouse.exporter import WarehouseExporter
 from app.warehouse.fact_nutrient import NutrientFactBuilder
@@ -15,20 +14,8 @@ from app.warehouse.fact_price_snapshot import (
 
 class WarehousePipeline:
     """
-    Pipeline responsável pela geração do
-    Data Warehouse analítico.
-
-    Fluxo:
-
-        DataFrame
-            ↓
-        Semantic Engine
-            ↓
-        dim_product
-        fact_nutrient
-        fact_price_snapshot
-            ↓
-        CSV
+    Pipeline responsável pela construção e exportação
+    do Data Warehouse.
     """
 
     def __init__(
@@ -36,146 +23,113 @@ class WarehousePipeline:
         output_dir: str = "data/output/warehouse",
     ) -> None:
 
-        self.semantic_engine = SemanticEngine()
-
         self.dim_builder = ProductDimensionBuilder()
 
         self.nutrient_builder = NutrientFactBuilder()
 
-        self.price_builder = (
-            PriceSnapshotFactBuilder()
-        )
+        self.price_builder = PriceSnapshotFactBuilder()
 
         self.exporter = WarehouseExporter(
             output_dir=output_dir,
         )
 
-    def run(
+    # ==========================================================
+    # Build
+    # ==========================================================
+
+    def build(
         self,
         dataframe: pd.DataFrame,
     ) -> dict[str, pd.DataFrame]:
-        """
-        Executa todo o pipeline.
-
-        Retorna todas as tabelas geradas.
-        """
-
-        enriched = self.semantic_engine.enrich_dataframe(
-            dataframe,
-        )
-
-        dim_product = self.dim_builder.build(
-            enriched,
-        )
-
-        fact_nutrient = (
-            self.nutrient_builder.build(
-                enriched,
-            )
-        )
-
-        fact_price_snapshot = (
-            self.price_builder.build(
-                enriched,
-            )
-        )
-
-        self.exporter.export_all(
-
-            dim_product=dim_product,
-
-            fact_nutrient=fact_nutrient,
-
-            fact_price_snapshot=fact_price_snapshot,
-
-        )
 
         return {
 
-            "dim_product": dim_product,
+            "dim_product":
+                self.dim_builder.build(
+                    dataframe,
+                ),
 
-            "fact_nutrient": fact_nutrient,
+            "fact_nutrient":
+                self.nutrient_builder.build(
+                    dataframe,
+                ),
 
-            "fact_price_snapshot": fact_price_snapshot,
+            "fact_price_snapshot":
+                self.price_builder.build(
+                    dataframe,
+                ),
 
         }
 
-    def run_from_csv(
-        self,
-        input_file: str | Path,
-    ) -> dict[str, pd.DataFrame]:
-        """
-        Executa o pipeline a partir
-        de um CSV.
-        """
+    # ==========================================================
+    # Export
+    # ==========================================================
 
-        dataframe = pd.read_csv(
-            input_file,
-            low_memory=False,
+    def export(
+        self,
+        tables: dict[str, pd.DataFrame],
+    ) -> dict[str, Path]:
+
+        return self.exporter.export_all(
+
+            dim_product=tables["dim_product"],
+
+            fact_nutrient=tables["fact_nutrient"],
+
+            fact_price_snapshot=tables[
+                "fact_price_snapshot"
+            ],
+
         )
 
-        return self.run(
+    # ==========================================================
+    # Run
+    # ==========================================================
+
+    def run(
+        self,
+        dataframe: pd.DataFrame,
+    ) -> tuple[
+        dict[str, pd.DataFrame],
+        dict[str, Path],
+    ]:
+
+        tables = self.build(
             dataframe,
         )
 
-    def run_from_parquet(
+        exported = self.export(
+            tables,
+        )
+
+        return (
+
+            tables,
+
+            exported,
+
+        )
+
+    # ==========================================================
+    # Utilidades
+    # ==========================================================
+
+    def clean(
         self,
-        input_file: str | Path,
-    ) -> dict[str, pd.DataFrame]:
-        """
-        Executa o pipeline a partir
-        de um arquivo Parquet.
-        """
-
-        dataframe = pd.read_parquet(
-            input_file,
-        )
-
-        return self.run(
-            dataframe,
-        )
-
-    def clean_output(self) -> None:
-        """
-        Remove todos os arquivos
-        anteriormente exportados.
-        """
+    ) -> None:
 
         self.exporter.clean_output_directory()
 
+    def list_exports(
+        self,
+    ) -> list[Path]:
 
-if __name__ == "__main__":
+        return self.exporter.list_exported_files()
 
-    INPUT_FILE = (
-        "data/output/clean/"
-        "nutrition_clean.parquet"
-    )
+    def metadata_exists(
+        self,
+    ) -> bool:
 
-    pipeline = WarehousePipeline()
-
-    pipeline.clean_output()
-
-    tables = pipeline.run_from_parquet(
-        INPUT_FILE,
-    )
-
-    print()
-
-    print("=" * 60)
-    print("DATA WAREHOUSE GERADO COM SUCESSO")
-    print("=" * 60)
-
-    for name, table in tables.items():
-
-        print(
-            f"{name:<25} "
-            f"{len(table):>8} registros"
+        return self.exporter.file_exists(
+            "warehouse_metadata.json",
         )
-
-    print()
-    print(
-        "Arquivos exportados para:"
-    )
-    print(
-        "data/output/warehouse/"
-    )

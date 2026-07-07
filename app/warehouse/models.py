@@ -2,100 +2,103 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Any
+
+
+# ==========================================================
+# Base
+# ==========================================================
 
 
 @dataclass(slots=True)
-class ProductDimension:
-    product_id: int
+class WarehouseModel:
 
-    sku: str | None = None
+    def to_dict(self) -> dict:
 
-    brand: str | None = None
-
-    manufacturer: str | None = None
-
-    product_name: str | None = None
-
-    product_url: str | None = None
-
-    image_url: str | None = None
-
-    category: str | None = None
-
-    product_category: str | None = None
-
-    product_tier: str | None = None
-
-    life_stage: str | None = None
-
-    breed_size: str | None = None
-
-    protein_source: str | None = None
-
-    clinical_category: str | None = None
-
-    package_size: float | None = None
-
-    package_unit: str | None = None
-
-    has_guarantee_levels: bool = False
-
-    created_at: datetime | None = None
-
-    updated_at: datetime | None = None
-
-    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+# ==========================================================
+# Dimensão Produto
+# ==========================================================
 
 
 @dataclass(slots=True)
-class NutrientFact:
-    product_id: int
+class ProductDimension(WarehouseModel):
 
-    nutrient: str
+    product_id: int | None
 
-    value: float | None
+    sku: str | None
 
-    unit: str | None
+    brand: str | None
 
-    normalization_status: str | None = None
+    manufacturer: str | None
 
-    rule_applied: str | None = None
+    product_name: str | None
 
-    confidence: float | None = None
+    product_url: str | None
 
-    snapshot_date: datetime | None = None
+    image_url: str | None
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+    category: str | None
+
+    product_category: str | None
+
+    product_tier: str | None
+
+    life_stage: str | None
+
+    breed_size: str | None
+
+    protein_source: str | None
+
+    clinical_category: str | None
+
+    package_size: float | None
+
+    package_unit: str | None
+
+    has_guarantee_levels: bool
+
+    created_at: datetime
+
+    updated_at: datetime
+
+
+# ==========================================================
+# Fato Nutrientes
+# ==========================================================
 
 
 @dataclass(slots=True)
-class PriceSnapshotFact:
-    product_id: int
+class NutrientFact(WarehouseModel):
 
-    snapshot_date: datetime
+    product_id: int | None
 
-    price: float | None = None
+    nutrient_name: str
 
-    subscriber_price: float | None = None
+    nutrient_value: float
 
-    price_per_kg: float | None = None
+    collected_at: datetime
 
-    currency: str = "BRL"
 
-    in_stock: bool = False
+# ==========================================================
+# Fato Preços
+# ==========================================================
 
-    has_price: bool = False
 
-    has_price_per_kg: bool = False
+@dataclass(slots=True)
+class PriceSnapshotFact(WarehouseModel):
 
-    has_subscriber_price: bool = False
+    product_id: int | None
 
-    seller: str | None = None
+    price: float | None
 
-    source: str | None = None
+    price_per_kg: float | None
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+    subscriber_price: float | None
+
+    subscriber_discount: float | None
+
+    available: bool | None
+
+    collected_at: datetime

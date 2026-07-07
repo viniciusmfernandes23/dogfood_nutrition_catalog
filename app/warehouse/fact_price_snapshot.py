@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pandas as pd
 
@@ -9,170 +9,90 @@ from app.warehouse.models import PriceSnapshotFact
 
 class PriceSnapshotFactBuilder:
     """
-    Constrói a tabela fact_price_snapshot.
-
-    Cada linha representa um snapshot de preço
-    de um produto.
+    Constrói a tabela fato de preços.
     """
 
     def __init__(self) -> None:
-        self.snapshot_date = datetime.utcnow()
+
+        self.timestamp = datetime.now(
+            UTC,
+        )
 
     def build(
         self,
         dataframe: pd.DataFrame,
     ) -> pd.DataFrame:
 
-        facts: list[dict] = []
+        if dataframe.empty:
 
-        for row in dataframe.to_dict(orient="records"):
+            return pd.DataFrame()
 
-            price = self._to_float(
-                row.get("price")
-            )
+        records: list[dict] = []
 
-            subscriber_price = self._to_float(
-                row.get("subscriber_price")
-            )
-
-            price_per_kg = self._to_float(
-                row.get("price_per_kg")
-            )
+        for row in dataframe.to_dict(
+            orient="records",
+        ):
 
             fact = PriceSnapshotFact(
 
-                product_id=row.get("product_id"),
-
-                snapshot_date=self.snapshot_date,
-
-                price=price,
-
-                subscriber_price=subscriber_price,
-
-                price_per_kg=price_per_kg,
-
-                currency=row.get(
-                    "currency",
-                    "BRL",
+                product_id=row.get(
+                    "product_id",
                 ),
 
-                in_stock=self._to_bool(
-                    row.get("in_stock")
+                price=row.get(
+                    "price",
                 ),
 
-                has_price=price is not None,
-
-                has_price_per_kg=(
-                    price_per_kg is not None
+                price_per_kg=row.get(
+                    "price_per_kg",
                 ),
 
-                has_subscriber_price=(
-                    subscriber_price is not None
+                subscriber_price=row.get(
+                    "subscriber_price",
                 ),
 
-                seller=row.get(
-                    "seller"
+                subscriber_discount=row.get(
+                    "subscriber_discount",
                 ),
 
-                source=row.get(
-                    "source"
+                available=row.get(
+                    "available",
                 ),
+
+                collected_at=self.timestamp,
 
             )
 
-            facts.append(
-                fact.to_dict()
+            records.append(
+                fact.to_dict(),
             )
 
-        fact_df = pd.DataFrame(facts)
+        fact_df = pd.DataFrame(
+            records,
+        )
 
-        if not fact_df.empty:
-
-            fact_df = (
-
-                fact_df
-
-                .sort_values(
-                    by=[
-                        "snapshot_date",
-                        "product_id",
-                    ]
-                )
-
-                .reset_index(
-                    drop=True
-                )
-
-            )
-
-        return fact_df
+        return self._sort(
+            fact_df,
+        )
 
     @staticmethod
-    def _to_float(
-        value,
-    ) -> float | None:
+    def _sort(
+        dataframe: pd.DataFrame,
+    ) -> pd.DataFrame:
 
-        if value is None:
-            return None
+        if dataframe.empty:
 
-        if pd.isna(value):
-            return None
+            return dataframe
 
-        try:
-            return float(value)
+        if "product_id" in dataframe.columns:
 
-        except (
-            TypeError,
-            ValueError,
-        ):
-            return None
+            dataframe = dataframe.sort_values(
+                by="product_id",
+            )
 
-    @staticmethod
-    def _to_bool(
-        value,
-    ) -> bool:
-
-        if isinstance(
-            value,
-            bool,
-        ):
-            return value
-
-        if value is None:
-            return False
-
-        if pd.isna(value):
-            return False
-
-        if isinstance(
-            value,
-            (int, float),
-        ):
-            return value > 0
-
-        value = str(
-            value
-        ).strip().lower()
-
-        return value in {
-
-            "true",
-
-            "1",
-
-            "sim",
-
-            "yes",
-
-            "y",
-
-            "disponível",
-
-            "available",
-
-            "in_stock",
-
-        }
+        return dataframe.reset_index(
+            drop=True,
+        )
 
     @staticmethod
     def export_csv(

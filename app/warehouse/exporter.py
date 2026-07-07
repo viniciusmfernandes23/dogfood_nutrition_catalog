@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -9,7 +9,7 @@ import pandas as pd
 
 class WarehouseExporter:
     """
-    Responsável por exportar as tabelas do Data Warehouse.
+    Responsável pela exportação das tabelas do Data Warehouse.
     """
 
     def __init__(
@@ -17,12 +17,18 @@ class WarehouseExporter:
         output_dir: str = "data/output/warehouse",
     ) -> None:
 
-        self.output_dir = Path(output_dir)
+        self.output_dir = Path(
+            output_dir,
+        )
 
         self.output_dir.mkdir(
             parents=True,
             exist_ok=True,
         )
+
+    # ==========================================================
+    # Exportações
+    # ==========================================================
 
     def export_dimension(
         self,
@@ -31,8 +37,8 @@ class WarehouseExporter:
     ) -> Path:
 
         return self._export_csv(
-            dataframe=dataframe,
-            filename=filename,
+            dataframe,
+            filename,
         )
 
     def export_fact(
@@ -42,8 +48,8 @@ class WarehouseExporter:
     ) -> Path:
 
         return self._export_csv(
-            dataframe=dataframe,
-            filename=filename,
+            dataframe,
+            filename,
         )
 
     def export_all(
@@ -56,26 +62,20 @@ class WarehouseExporter:
 
         exported = {
 
-            "dim_product":
+            "dim_product": self.export_dimension(
+                dim_product,
+                "dim_product.csv",
+            ),
 
-                self.export_dimension(
-                    dim_product,
-                    "dim_product.csv",
-                ),
+            "fact_nutrient": self.export_fact(
+                fact_nutrient,
+                "fact_nutrient.csv",
+            ),
 
-            "fact_nutrient":
-
-                self.export_fact(
-                    fact_nutrient,
-                    "fact_nutrient.csv",
-                ),
-
-            "fact_price_snapshot":
-
-                self.export_fact(
-                    fact_price_snapshot,
-                    "fact_price_snapshot.csv",
-                ),
+            "fact_price_snapshot": self.export_fact(
+                fact_price_snapshot,
+                "fact_price_snapshot.csv",
+            ),
 
         }
 
@@ -92,9 +92,9 @@ class WarehouseExporter:
 
         metadata = {
 
-            "generated_at":
-
-                datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(
+                UTC,
+            ).isoformat(),
 
             "files": {
 
@@ -102,11 +102,15 @@ class WarehouseExporter:
 
                     "path": str(path),
 
-                    "rows": self._count_rows(path),
+                    "rows": self._count_rows(
+                        path,
+                    ),
 
-                    "size_bytes": path.stat().st_size
-                    if path.exists()
-                    else 0,
+                    "size_bytes": (
+                        path.stat().st_size
+                        if path.exists()
+                        else 0
+                    ),
 
                 }
 
@@ -123,19 +127,23 @@ class WarehouseExporter:
             / "warehouse_metadata.json"
         )
 
-        with metadata_path.open(
-            "w",
-            encoding="utf-8",
-        ) as fp:
+        metadata_path.write_text(
 
-            json.dump(
+            json.dumps(
                 metadata,
-                fp,
                 indent=4,
                 ensure_ascii=False,
-            )
+            ),
+
+            encoding="utf-8",
+
+        )
 
         return metadata_path
+
+    # ==========================================================
+    # CSV
+    # ==========================================================
 
     def _export_csv(
         self,
@@ -160,6 +168,10 @@ class WarehouseExporter:
 
         return output_file
 
+    # ==========================================================
+    # Helpers
+    # ==========================================================
+
     @staticmethod
     def _count_rows(
         file_path: Path,
@@ -172,21 +184,27 @@ class WarehouseExporter:
         try:
 
             return len(
+
                 pd.read_csv(
                     file_path,
                     low_memory=False,
                 )
+
             )
 
         except Exception:
 
             return 0
 
+    # ==========================================================
+    # Utilidades
+    # ==========================================================
+
     def clean_output_directory(
         self,
     ) -> None:
 
-        for file in self.output_dir.glob("*"):
+        for file in self.output_dir.iterdir():
 
             if file.is_file():
 
@@ -209,7 +227,19 @@ class WarehouseExporter:
         return sorted(
 
             self.output_dir.glob(
-                "*.csv"
+                "*.csv",
+            )
+
+        )
+
+    def list_metadata_files(
+        self,
+    ) -> list[Path]:
+
+        return sorted(
+
+            self.output_dir.glob(
+                "*.json",
             )
 
         )
