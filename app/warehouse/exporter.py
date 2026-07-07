@@ -10,6 +10,7 @@ import pandas as pd
 class WarehouseExporter:
     """
     Responsável pela exportação das tabelas do Data Warehouse.
+    Suporta exportação incremental (append) para tabelas fato.
     """
 
     def __init__(
@@ -35,10 +36,11 @@ class WarehouseExporter:
         dataframe: pd.DataFrame,
         filename: str,
     ) -> Path:
-
+        """Dimensões são sobrescritas para manter o estado atual."""
         return self._export_csv(
             dataframe,
             filename,
+            append=False
         )
 
     def export_fact(
@@ -46,10 +48,11 @@ class WarehouseExporter:
         dataframe: pd.DataFrame,
         filename: str,
     ) -> Path:
-
+        """Tabelas fato são incrementais para manter o histórico."""
         return self._export_csv(
             dataframe,
             filename,
+            append=True
         )
 
     def export_all(
@@ -61,22 +64,18 @@ class WarehouseExporter:
     ) -> dict[str, Path]:
 
         exported = {
-
             "dim_product": self.export_dimension(
                 dim_product,
                 "dim_product.csv",
             ),
-
             "fact_nutrient": self.export_fact(
                 fact_nutrient,
                 "fact_nutrient.csv",
             ),
-
             "fact_price_snapshot": self.export_fact(
                 fact_price_snapshot,
                 "fact_price_snapshot.csv",
             ),
-
         }
 
         self.export_metadata(
@@ -91,35 +90,24 @@ class WarehouseExporter:
     ) -> Path:
 
         metadata = {
-
             "generated_at": datetime.now(
                 UTC,
             ).isoformat(),
-
             "files": {
-
                 name: {
-
                     "path": str(path),
-
                     "rows": self._count_rows(
                         path,
                     ),
-
                     "size_bytes": (
                         path.stat().st_size
                         if path.exists()
                         else 0
                     ),
-
                 }
-
                 for name, path
-
                 in exported_files.items()
-
             },
-
         }
 
         metadata_path = (
@@ -128,15 +116,12 @@ class WarehouseExporter:
         )
 
         metadata_path.write_text(
-
             json.dumps(
                 metadata,
                 indent=4,
                 ensure_ascii=False,
             ),
-
             encoding="utf-8",
-
         )
 
         return metadata_path
@@ -149,6 +134,7 @@ class WarehouseExporter:
         self,
         dataframe: pd.DataFrame,
         filename: str,
+        append: bool = False
     ) -> Path:
 
         output_file = (
@@ -156,14 +142,34 @@ class WarehouseExporter:
             / filename
         )
 
+        # Se for append e o arquivo já existir, carregamos o existente para evitar duplicatas
+        # (Heurística simples: se o product_id + collected_at já existir, não adicionamos)
+        if append and output_file.exists():
+            try:
+                existing_df = pd.read_csv(output_file, encoding="utf-8-sig")
+                # Concatenamos e removemos duplicatas
+                combined_df = pd.concat([existing_df, dataframe], ignore_index=True)
+                
+                # Remove duplicatas baseadas em colunas chave se existirem
+                subset = []
+                if "product_id" in combined_df.columns:
+                    subset.append("product_id")
+                if "collected_at" in combined_df.columns:
+                    subset.append("collected_at")
+                if "nutrient_name" in combined_df.columns:
+                    subset.append("nutrient_name")
+                
+                if subset:
+                    combined_df = combined_df.drop_duplicates(subset=subset, keep='last')
+                
+                dataframe = combined_df
+            except Exception:
+                pass # Se falhar ao ler, sobrescrevemos por segurança
+
         dataframe.to_csv(
-
             output_file,
-
             index=False,
-
             encoding="utf-8-sig",
-
         )
 
         return output_file
@@ -178,36 +184,24 @@ class WarehouseExporter:
     ) -> int:
 
         if not file_path.exists():
-
             return 0
 
         try:
-
             return len(
-
                 pd.read_csv(
                     file_path,
                     low_memory=False,
                 )
-
             )
-
         except Exception:
-
             return 0
-
-    # ==========================================================
-    # Utilidades
-    # ==========================================================
 
     def clean_output_directory(
         self,
     ) -> None:
 
         for file in self.output_dir.iterdir():
-
             if file.is_file():
-
                 file.unlink()
 
     def file_exists(
@@ -225,11 +219,9 @@ class WarehouseExporter:
     ) -> list[Path]:
 
         return sorted(
-
             self.output_dir.glob(
                 "*.csv",
             )
-
         )
 
     def list_metadata_files(
@@ -237,9 +229,7 @@ class WarehouseExporter:
     ) -> list[Path]:
 
         return sorted(
-
             self.output_dir.glob(
                 "*.json",
             )
-
         )

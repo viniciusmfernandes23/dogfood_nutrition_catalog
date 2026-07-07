@@ -14,6 +14,16 @@ from app.pipeline.orchestrator import PipelineOrchestrator
 from app.pipeline.models import PipelineConfig
 from app.parsers.nutrition_parser import parse_nutrition
 
+def format_currency(value):
+    """Formata valor para padrão de moeda brasileira amigável ao Power BI."""
+    if value is None or pd.isna(value):
+        return None
+    # O Power BI lê melhor números com vírgula se a localidade for Brasil, 
+    # mas para exportação CSV universal, o ideal é manter o número 
+    # e deixar o Power BI formatar. 
+    # No entanto, o usuário pediu especificamente o formato R$.
+    return f"R$ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
 def run_extraction():
     print("Iniciando coleta de dados...")
     
@@ -29,11 +39,10 @@ def run_extraction():
         try:
             raw_products = collector.fetch_all()
         except Exception as e:
-            print(f"AVISO: Falha na API ({e}). Usando dados simulados para validar estrutura de pastas.")
+            print(f"AVISO: Falha na API ({e}). Usando dados simulados.")
             raw_products = []
 
         if not raw_products:
-            # Dados simulados para garantir que o pipeline rode e crie as pastas
             product_list = [
                 {
                     'product_id': '123',
@@ -41,7 +50,7 @@ def run_extraction():
                     'brand': 'Marca Teste',
                     'url': 'http://teste.com',
                     'category_id': '1',
-                    'price': 100.0,
+                    'price': 100.50,
                     'available': True,
                     'raw_guarantee': 'Proteína 26%, Sódio 2g/kg'
                 }
@@ -58,17 +67,30 @@ def run_extraction():
                     'price': None,
                     'available': False,
                 }
+                
+                if hasattr(p, 'api_payload') and p.api_payload:
+                    try:
+                        items = p.api_payload.get('items', [])
+                        if items:
+                            sellers = items[0].get('sellers', [])
+                            if sellers:
+                                comm = sellers[0].get('commertialOffer', {})
+                                p_dict['price'] = comm.get('Price')
+                                p_dict['available'] = comm.get('AvailableQuantity', 0) > 0
+                    except Exception:
+                        pass
                 product_list.append(p_dict)
             
         df = pd.DataFrame(product_list)
         
         # 2. Coleta de Níveis de Garantia (Crawler)
-        full_df = df.head(10).copy()
+        full_df = df.head(50).copy()
         if 'raw_guarantee' not in full_df.columns:
             print(f"Extraindo níveis de garantia...")
             crawler = CobasiCrawler()
             guarantees = []
-            for url in full_df['url']:
+            for i, url in enumerate(full_df['url']):
+                if i % 10 == 0: print(f"  Progresso: {i}/{len(full_df)}")
                 try:
                     res = crawler.collect(url)
                     guarantees.append(res.guarantee_section if res.success else None)
@@ -110,11 +132,25 @@ def run_extraction():
         
         if result.success:
             print(f"\nPipeline concluído com sucesso!")
-            print(f"Arquivos exportados para a pasta: {OUTPUT_DIR}")
+            
+            # 5. Formatação Final para o Usuário (Power BI Friendly)
+            print("Aplicando formatação de moeda para exportação final...")
             
             for name, path in result.exported_files.items():
                 dest_path = os.path.join(OUTPUT_DIR, os.path.basename(str(path)))
-                shutil.copy(str(path), dest_path)
+                
+                # Se for a tabela de preços, aplicamos a formatação de moeda
+                if name == "fact_price_snapshot":
+                    temp_df = pd.read_csv(path, encoding="utf-8-sig")
+                    # Mantemos uma cópia numérica para cálculos e uma formatada para exibição se necessário
+                    # Mas para atender o pedido, vamos formatar as colunas de preço
+                    for col in ['price', 'price_per_kg', 'subscriber_price']:
+                        if col in temp_df.columns:
+                            temp_df[col] = temp_df[col].apply(format_currency)
+                    temp_df.to_csv(dest_path, index=False, encoding="utf-8-sig")
+                else:
+                    shutil.copy(str(path), dest_path)
+                
                 print(f"  - {dest_path}")
         else:
             print(f"Erro no orquestrador: {result.errors}")
