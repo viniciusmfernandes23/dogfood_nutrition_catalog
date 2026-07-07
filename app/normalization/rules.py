@@ -59,7 +59,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         field="ash_gkg",
         target_min=10,
         target_max=200,
-        overscale_factor=1,
+        overscale_factor=10, # Permite corrigir se o valor 10x chegar aqui por erro de fluxo
         percent_factor=PERCENT_TO_GKG_FACTOR,
     ),
 
@@ -116,7 +116,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         field="potassium_mgkg",
         target_min=1500,
         target_max=50000,
-        overscale_factor=1,
+        overscale_factor=10, # Permite corrigir se o valor 10x chegar aqui
         percent_factor=PERCENT_TO_MGKG_FACTOR,
         gkg_to_mgkg=True,
     ),

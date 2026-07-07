@@ -52,6 +52,10 @@ class PipelineOrchestrator:
 
         self.metrics.start()
 
+        # Se configurado para sobrescrever, limpamos o diretório antes da execução
+        if self.config.overwrite:
+            self.clean_output()
+
         result = PipelineResult(
 
             success=True,
