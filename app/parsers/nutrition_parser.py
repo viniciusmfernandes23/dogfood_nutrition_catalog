@@ -42,14 +42,25 @@ def parse_value(
         if not match:
             continue
 
-        value = float(match.group(1).replace(",", "."))
-        unit = match.group(2).lower()
+        try:
+            value = float(match.group(1).replace(",", "."))
+            unit = match.group(2).strip().lower() if match.group(2) else None
+            
+            # Normalização básica de unidades comuns para facilitar o resolver
+            if unit in ["%", "por cento", "porcentagem"]:
+                unit = "%"
+            elif unit in ["g/kg", "g / kg", "g.kg"]:
+                unit = "g/kg"
+            elif unit in ["mg/kg", "mg / kg", "mg.kg"]:
+                unit = "mg/kg"
 
-        return (
-            value,
-            unit,
-            alias,
-        )
+            return (
+                value,
+                unit,
+                alias,
+            )
+        except (ValueError, IndexError):
+            continue
 
     return (
         None,
@@ -92,10 +103,11 @@ def parse_nutrition(
             aliases=aliases,
         )
 
-        parsed[nutrient] = {
-            "value": value,
-            "unit": unit,
-            "matched_alias": matched_alias,
-        }
+        if value is not None:
+            parsed[nutrient] = {
+                "value": value,
+                "unit": unit,
+                "matched_alias": matched_alias,
+            }
 
     return parsed

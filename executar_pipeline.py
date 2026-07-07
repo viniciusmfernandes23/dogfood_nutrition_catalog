@@ -2,10 +2,17 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import sys
+import os
+import shutil
+
+# Garantir que o diretório app está no path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from app.collectors.cobasi_api import CobasiAPICollector
 from app.collectors.crawler import CobasiCrawler
+from app.pipeline.orchestrator import PipelineOrchestrator
+from app.pipeline.models import PipelineConfig
 from app.parsers.nutrition_parser import parse_nutrition
-from app.semantic.engine import SemanticEngine
 
 def run_extraction():
     print("Iniciando coleta de dados...")
@@ -16,9 +23,7 @@ def run_extraction():
         raw_products = collector.fetch_all()
         
         if not raw_products:
-            print("AVISO: Nenhum produto foi retornado pela API da Cobasi. Verifique sua conexão ou os IDs das categorias.")
-            # Criar arquivos vazios com cabeçalhos para cumprir o objetivo
-            gerar_arquivos_vazios()
+            print("AVISO: Nenhum produto foi retornado pela API da Cobasi.")
             return
 
         product_list = []
@@ -32,7 +37,6 @@ def run_extraction():
                 'price': None,
                 'subscriber_price': None,
                 'available': False,
-                'price_per_kg': 0
             }
             
             if hasattr(p, 'api_payload') and p.api_payload:
@@ -44,10 +48,6 @@ def run_extraction():
                             comm = sellers[0].get('commertialOffer', {})
                             p_dict['price'] = comm.get('Price')
                             p_dict['available'] = comm.get('AvailableQuantity', 0) > 0
-                            # Tentar extrair preço de assinante se houver Teasers
-                            teasers = comm.get('Teasers', [])
-                            if teasers:
-                                p_dict['subscriber_price'] = p_dict['price'] * 0.9 # Geralmente 10% na Cobasi
                 except Exception:
                     pass
             product_list.append(p_dict)
@@ -55,10 +55,13 @@ def run_extraction():
         df = pd.DataFrame(product_list)
         
         # 2. Coleta de Níveis de Garantia (Crawler)
-        print(f"Extraindo níveis de garantia de {len(df)} páginas...")
+        full_df = df.head(50).copy()
+        print(f"Extraindo níveis de garantia de {len(full_df)} produtos...")
         crawler = CobasiCrawler()
         guarantees = []
-        for url in df['url']:
+        
+        for i, url in enumerate(full_df['url']):
+            if i % 10 == 0: print(f"  Progresso: {i}/{len(full_df)}")
             if url:
                 try:
                     res = crawler.collect(url)
@@ -67,80 +70,54 @@ def run_extraction():
                     guarantees.append(None)
             else:
                 guarantees.append(None)
-        df['raw_guarantee'] = guarantees
+        full_df['raw_guarantee'] = guarantees
         
-        # 3. Enriquecimento Semântico
-        print("Aplicando inteligência semântica...")
-        semantic_engine = SemanticEngine()
-        # Garantir colunas para o engine
-        for col in ['description', 'ingredients', 'category']:
-            if col not in df.columns:
-                df[col] = ""
-                
-        full_df = semantic_engine.enrich_dataframe(df)
-
-        # --- GERAÇÃO DOS ARQUIVOS FINAIS ---
-        gerar_csvs(full_df)
+        # 3. Parsing e Mapeamento de Nutrientes
+        print("Fazendo parsing e mapeando nutrientes para normalização...")
+        mapping = {
+            'protein': 'protein_gkg',
+            'fat': 'fat_gkg',
+            'fiber': 'fiber_gkg',
+            'ash': 'ash_gkg',
+            'moisture': 'moisture_gkg',
+            'calcium_min': 'calcium_min_mgkg',
+            'calcium_max': 'calcium_max_mgkg',
+            'phosphorus': 'phosphorus_mgkg',
+            'sodium': 'sodium_mgkg',
+            'potassium': 'potassium_mgkg'
+        }
+        
+        for index, row in full_df.iterrows():
+            nutrients = parse_nutrition(row['raw_guarantee'])
+            for nut_key, nut_data in nutrients.items():
+                target_col = mapping.get(nut_key)
+                if target_col:
+                    full_df.at[index, target_col] = nut_data['value']
+                    # IMPORTANTE: O engine usa field.split('_')[0] + "_unit"
+                    # Para 'sodium_mgkg', ele busca 'sodium_unit'
+                    full_df.at[index, f"{nut_key}_unit"] = nut_data['unit']
+        
+        # 4. Executar o Orquestrador
+        print("Executando orquestrador do pipeline...")
+        config = PipelineConfig(
+            output_directory="data/reports",
+            warehouse_directory="data/warehouse"
+        )
+        orchestrator = PipelineOrchestrator(config)
+        result = orchestrator.run(full_df)
+        
+        if result.success:
+            print("\nPipeline concluído com sucesso!")
+            for name, path in result.exported_files.items():
+                shutil.copy(str(path), os.path.basename(str(path)))
+                print(f"  - {os.path.basename(str(path))}")
+        else:
+            print(f"Erro no orquestrador: {result.errors}")
 
     except Exception as e:
-        print(f"ERRO CRÍTICO NO PIPELINE: {e}")
+        print(f"ERRO CRÍTICO: {e}")
         import traceback
         traceback.print_exc()
-
-def gerar_csvs(full_df):
-    print("Gerando arquivos CSV...")
-    now = datetime.now()
-
-    # 1. dim_product.csv
-    dim_cols = {
-        'product_id': 'product_id', 'product_name': 'product_name', 'brand': 'brand',
-        'url': 'url', 'ingredients': 'ingredients', 'life_stage': 'fase_vida',
-        'breed_size': 'porte', 'clinical_category': 'categoria_clinica',
-        'product_tier': 'nivel_produto', 'protein_source': 'fonte_proteina',
-        'product_category': 'categoria_produto'
-    }
-    dim_product = full_df[list(dim_cols.keys())].rename(columns=dim_cols)
-    dim_product['linha_veterinaria'] = dim_product['categoria_clinica'].apply(lambda x: 'Sim' if x and x != 'Nenhuma' else 'Não')
-    dim_product.to_csv('dim_product.csv', index=False, encoding='utf-8-sig')
-
-    # 2. fact_nutrient.csv
-    nutrient_records = []
-    for _, row in full_df.iterrows():
-        nutrients = parse_nutrition(row.get('raw_guarantee'))
-        for key, data in nutrients.items():
-            if data.get('value') is not None:
-                nutrient_records.append({
-                    'product_id': row['product_id'],
-                    'product_name': row['product_name'],
-                    'manufacturer': row.get('brand', 'N/A'),
-                    'nutrient_key': key,
-                    'nutrient_value': data['value'],
-                    'nutrient_name': data.get('matched_alias', key),
-                    'unit': data['unit']
-                })
-    pd.DataFrame(nutrient_records).to_csv('fact_nutrient.csv', index=False, encoding='utf-8-sig')
-
-    # 3. fact_price_snapshot.csv
-    fact_price = pd.DataFrame([{
-        'snapshot_date': now.strftime('%Y-%m-%d'),
-        'collection_timestamp': now.strftime('%Y-%m-%d %H:%M:%S'),
-        'product_id': row['product_id'],
-        'price_brl': row.get('price'),
-        'subscriber_price_brl': row.get('subscriber_price'),
-        'price_per_kg_brl': row.get('price_per_kg', 0),
-        'availability': row.get('available', False),
-        'source': 'Cobasi'
-    } for _, row in full_df.iterrows()])
-    fact_price.to_csv('fact_price_snapshot.csv', index=False, encoding='utf-8-sig')
-
-    print("\nSucesso! Arquivos gerados: dim_product.csv, fact_nutrient.csv, fact_price_snapshot.csv")
-
-def gerar_arquivos_vazios():
-    # Cria os arquivos apenas com cabeçalhos caso a coleta falhe
-    pd.DataFrame(columns=['product_id','product_name','brand','url','ingredients','fase_vida','porte','categoria_clinica','linha_veterinaria','fonte_proteina','nivel_produto','categoria_produto']).to_csv('dim_product.csv', index=False)
-    pd.DataFrame(columns=['product_id','product_name','manufacturer','nutrient_key','nutrient_value','nutrient_name','unit']).to_csv('fact_nutrient.csv', index=False)
-    pd.DataFrame(columns=['snapshot_date','collection_timestamp','product_id','price_brl','subscriber_price_brl','price_per_kg_brl','availability','source']).to_csv('fact_price_snapshot.csv', index=False)
-    print("Arquivos vazios gerados com cabeçalhos.")
 
 if __name__ == "__main__":
     run_extraction()
