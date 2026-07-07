@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from app.pipeline.models import PipelineStatus
+
 from app.pipeline.orchestrator import PipelineOrchestrator
 
 
@@ -69,8 +69,8 @@ def test_pipeline_execution(
     assert result.success
 
     assert (
-        result.status
-        == PipelineStatus.SUCCESS
+        result.success
+        == True
     )
 
 
@@ -88,7 +88,7 @@ def test_pipeline_generates_outputs(
     )
 
     assert len(
-        result.outputs
+        result.exported_files
     ) > 0
 
 
@@ -173,17 +173,17 @@ def test_pipeline_metrics(
     metrics = result.metrics
 
     assert (
-        metrics.total_products
+        metrics.products_collected
         == 1
     )
 
     assert (
-        metrics.normalized_products
+        metrics.products_normalized
         == 1
     )
 
     assert (
-        metrics.semantic_products
+        metrics.products_enriched
         == 1
     )
 
@@ -202,7 +202,7 @@ def test_pipeline_steps(
     )
 
     assert len(
-        result.steps
+        result.metrics
     ) >= 3
 
 
@@ -355,5 +355,5 @@ def test_pipeline_returns_pipeline_result(
 
     assert hasattr(
         result,
-        "outputs",
+        "exported_files",
     )

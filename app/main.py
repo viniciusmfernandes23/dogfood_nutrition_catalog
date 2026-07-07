@@ -108,7 +108,7 @@ def main() -> int:
     print("=" * 70)
 
     print(
-        f"STATUS: {result.status.value.upper()}"
+        f"STATUS: {'SUCCESS' if result.success else 'FAILED'}"
     )
 
     print("=" * 70)
@@ -116,40 +116,40 @@ def main() -> int:
     metrics = result.metrics
 
     print(
-        f"Total produtos.............: {metrics.total_products}"
+        f"Total produtos.............: {metrics.products_collected}"
     )
 
     print(
-        f"Normalizados...............: {metrics.normalized_products}"
+        f"Normalizados...............: {metrics.products_normalized}"
     )
 
     print(
-        f"Semântica aplicada.........: {metrics.semantic_products}"
+        f"Semântica aplicada.........: {metrics.products_enriched}"
     )
 
     print(
-        f"Exportados.................: {metrics.exported_products}"
+        f"Exportados.................: {metrics.products_exported}"
     )
 
     print(
-        f"Warnings...................: {metrics.warnings}"
+        f"Warnings...................: {len(result.warnings)}"
     )
 
     print(
-        f"Erros......................: {metrics.total_errors}"
+        f"Erros......................: {len(result.errors)}"
     )
 
     print(
         f"Tempo total................: {metrics.execution_time_seconds:.2f}s"
     )
 
-    if result.outputs:
+    if result.exported_files:
 
         print()
 
         print("Arquivos gerados:")
 
-        for name, path in result.outputs.items():
+        for name, path in result.exported_files.items():
 
             print(
                 f"  • {name:<25} {path}"

@@ -14,5 +14,4 @@ class ProductCollection:
     url: str | None
 
     category_id: int | None
-
-    api_payload: dict[str, Any]
+    api_payload: dict[str, Any] | None = None

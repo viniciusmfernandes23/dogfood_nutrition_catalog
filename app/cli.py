@@ -73,21 +73,21 @@ def print_summary(result) -> None:
     print("PIPELINE SUMMARY")
     print("=" * 70)
 
-    print(f"Status.................... {result.status.value}")
+    print(f"Status.................... {"SUCCESS" if result.success else "FAILED"}")
     print(f"Tempo..................... {metrics.execution_time_seconds:.2f}s")
-    print(f"Produtos................. {metrics.total_products}")
-    print(f"Normalizados............ {metrics.normalized_products}")
-    print(f"Semântica............... {metrics.semantic_products}")
-    print(f"Exportados.............. {metrics.exported_products}")
-    print(f"Warnings................ {metrics.warnings}")
-    print(f"Erros................... {metrics.total_errors}")
+    print(f"Produtos................. {metrics.products_collected}")
+    print(f"Normalizados............ {metrics.products_normalized}")
+    print(f"Semântica............... {metrics.products_enriched}")
+    print(f"Exportados.............. {metrics.products_exported}")
+    print(f"Warnings................ {len(result.warnings)}")
+    print(f"Erros................... {len(result.errors)}")
 
-    if result.outputs:
+    if result.exported_files:
 
         print()
         print("Arquivos gerados:")
 
-        for name, path in sorted(result.outputs.items()):
+        for name, path in sorted(result.exported_files.items()):
 
             print(f"  • {name:<24} {path}")
 
