@@ -16,19 +16,14 @@ class ProductDimensionBuilder:
         "product_id",
         "sku",
         "brand",
-        "manufacturer",
         "product_name",
         "product_url",
-        "image_url",
-        "category",
         "product_category",
         "product_tier",
         "life_stage",
         "breed_size",
         "protein_source",
         "clinical_category",
-        "package_size",
-        "package_unit",
     )
 
     NUTRIENT_SUFFIXES = (
@@ -62,15 +57,10 @@ class ProductDimensionBuilder:
 
                 brand=row.get("brand"),
 
-                manufacturer=row.get("manufacturer"),
-
                 product_name=row.get("product_name"),
 
-                product_url=row.get("product_url"),
-
-                image_url=row.get("image_url"),
-
-                category=row.get("category"),
+                # Remapeamento: a coleta produz 'url', a dimensão espera 'product_url'
+                product_url=row.get("product_url") or row.get("url"),
 
                 product_category=row.get("product_category"),
 
@@ -83,10 +73,6 @@ class ProductDimensionBuilder:
                 protein_source=row.get("protein_source"),
 
                 clinical_category=row.get("clinical_category"),
-
-                package_size=row.get("package_size"),
-
-                package_unit=row.get("package_unit"),
 
                 has_guarantee_levels=self._has_guarantee_levels(
                     row,

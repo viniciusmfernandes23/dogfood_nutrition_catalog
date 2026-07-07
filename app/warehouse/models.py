@@ -31,15 +31,9 @@ class ProductDimension(WarehouseModel):
 
     brand: str | None
 
-    manufacturer: str | None
-
     product_name: str | None
 
     product_url: str | None
-
-    image_url: str | None
-
-    category: str | None
 
     product_category: str | None
 
@@ -52,10 +46,6 @@ class ProductDimension(WarehouseModel):
     protein_source: str | None
 
     clinical_category: str | None
-
-    package_size: float | None
-
-    package_unit: str | None
 
     has_guarantee_levels: bool
 
@@ -92,12 +82,6 @@ class PriceSnapshotFact(WarehouseModel):
     product_id: int | None
 
     price: float | None
-
-    price_per_kg: float | None
-
-    subscriber_price: float | None
-
-    subscriber_discount: float | None
 
     available: bool | None
 

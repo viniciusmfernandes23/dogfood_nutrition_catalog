@@ -18,16 +18,11 @@ def format_currency(value):
     """Formata valor para padrão de moeda brasileira amigável ao Power BI."""
     if value is None or pd.isna(value):
         return None
-    # O Power BI interpreta o ponto como separador de milhar se houver vírgula.
-    # Se o valor for 57.27, f"{value:,.2f}" gera "57.27".
-    # O replace(".", ",") gera "57,27".
-    # Se o valor fosse 1500.50, f"{value:,.2f}" gera "1,500.50".
-    # O replace(",", "X").replace(".", ",").replace("X", ".") gera "1.500,50".
-    # Para evitar que "57,27" seja lido como "5.727", garantimos que não haja pontos se não houver milhar.
-    formatted = f"{value:,.2f}"
-    if value < 1000:
-        return f"R$ {formatted.replace('.', ',')}"
-    return f"R$ {formatted.replace(',', 'X').replace('.', ',').replace('X', '.')}"
+    # Para evitar que o Power BI interprete errado o separador decimal:
+    # A melhor prática para CSVs brasileiros é usar o formato decimal com vírgula 
+    # e SEM separador de milhar para evitar que o Power BI confunda o ponto com milhar.
+    # Ex: 1500.50 -> "1500,50"
+    return f"{value:.2f}".replace(".", ",")
 
 def fix_nutrient_scale(value):
     """
@@ -161,14 +156,9 @@ def run_extraction():
                 # Se for a tabela de preços, aplicamos a formatação de moeda
                 if name == "fact_price_snapshot":
                     temp_df = pd.read_csv(path, encoding="utf-8-sig")
-                    # Mantemos uma cópia numérica para cálculos e uma formatada para exibição se necessário
-                    # Mas para atender o pedido, vamos formatar as colunas de preço
+                    # Formata as colunas de preço para padrão brasileiro (vírgula como decimal)
                     for col in ['price', 'price_per_kg', 'subscriber_price']:
                         if col in temp_df.columns:
-                            # O Power BI interpreta o ponto como separador de milhar se houver vírgula,
-                            # o que causou o erro de R$ 57,27 virar R$ 5.727.
-                            # Para exportação CSV, o ideal é manter o número puro e deixar o Power BI formatar,
-                            # ou garantir que a string não seja ambígua.
                             temp_df[col] = temp_df[col].apply(format_currency)
                     temp_df.to_csv(dest_path, index=False, encoding="utf-8-sig")
                 else:

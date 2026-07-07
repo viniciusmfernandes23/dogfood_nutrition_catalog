@@ -43,18 +43,6 @@ class PriceSnapshotFactBuilder:
                     "price",
                 ),
 
-                price_per_kg=row.get(
-                    "price_per_kg",
-                ),
-
-                subscriber_price=row.get(
-                    "subscriber_price",
-                ),
-
-                subscriber_discount=row.get(
-                    "subscriber_discount",
-                ),
-
                 available=row.get(
                     "available",
                 ),
