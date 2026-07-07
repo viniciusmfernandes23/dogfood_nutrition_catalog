@@ -4,7 +4,7 @@ from dataclasses import dataclass
 @dataclass(slots=True)
 class PipelineConfig:
 
-    timeout: int = 30
+    timeout: int = 60
 
     retries: int = 3
 
