@@ -3,277 +3,168 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pandas as pd
-
 from app.pipeline.models import PipelineResult
 
 
 class PipelineReport:
     """
-    Gera os relatórios finais da execução do pipeline.
+    Responsável pela geração do relatório final do pipeline.
     """
 
     def __init__(
         self,
-        output_dir: str = "data/output/reports",
+        output_dir: str = "data/output",
     ) -> None:
 
-        self.output_dir = Path(output_dir)
+        self.output_dir = Path(
+            output_dir,
+        )
 
         self.output_dir.mkdir(
             parents=True,
             exist_ok=True,
         )
 
-    def export(
+    # ==========================================================
+    # Relatórios
+    # ==========================================================
+
+    def build(
         self,
         result: PipelineResult,
-    ) -> dict[str, Path]:
+    ) -> dict:
 
-        files = {}
+        return result.to_dict()
 
-        files["json"] = self.export_json(result)
-
-        files["csv"] = self.export_csv(result)
-
-        files["txt"] = self.export_txt(result)
-
-        return files
-
-    def export_json(
+    def save_json(
         self,
         result: PipelineResult,
+        filename: str = "pipeline_report.json",
     ) -> Path:
 
-        output = (
-            self.output_dir
-            / "pipeline_report.json"
+        report = self.build(
+            result,
         )
 
-        with output.open(
-            "w",
-            encoding="utf-8",
-        ) as fp:
+        output_file = (
+            self.output_dir
+            / filename
+        )
 
-            json.dump(
+        output_file.write_text(
 
-                result.to_dict(),
-
-                fp,
-
+            json.dumps(
+                report,
                 indent=4,
-
                 ensure_ascii=False,
-
                 default=str,
+            ),
 
-            )
-
-        return output
-
-    def export_csv(
-        self,
-        result: PipelineResult,
-    ) -> Path:
-
-        output = (
-            self.output_dir
-            / "pipeline_report.csv"
-        )
-
-        rows = []
-
-        for step in result.steps:
-
-            rows.append(
-
-                {
-
-                    "step": step.name,
-
-                    "status": step.status.value,
-
-                    "duration_seconds": step.duration_seconds,
-
-                    "records_processed": step.records_processed,
-
-                    "errors": step.errors,
-
-                    "message": step.message,
-
-                }
-
-            )
-
-        pd.DataFrame(rows).to_csv(
-
-            output,
-
-            index=False,
-
-            encoding="utf-8-sig",
-
-        )
-
-        return output
-
-    def export_txt(
-        self,
-        result: PipelineResult,
-    ) -> Path:
-
-        output = (
-            self.output_dir
-            / "pipeline_report.txt"
-        )
-
-        with output.open(
-            "w",
             encoding="utf-8",
-        ) as fp:
 
-            fp.write("=" * 70)
-            fp.write("\n")
-            fp.write("DOG FOOD NUTRITION PIPELINE REPORT\n")
-            fp.write("=" * 70)
-            fp.write("\n\n")
+        )
 
-            fp.write(
-                f"Status: {result.status.value}\n"
-            )
+        return output_file
 
-            fp.write(
-                f"Started At: {result.metrics.started_at}\n"
-            )
+    # ==========================================================
+    # Console
+    # ==========================================================
 
-            fp.write(
-                f"Finished At: {result.metrics.finished_at}\n"
-            )
+    @staticmethod
+    def print_summary(
+        result: PipelineResult,
+    ) -> None:
 
-            fp.write(
-                f"Execution Time: {result.metrics.execution_time_seconds:.3f}s\n"
-            )
+        metrics = result.metrics
 
-            fp.write("\n")
+        print()
 
-            fp.write("METRICS\n")
-            fp.write("-" * 70)
-            fp.write("\n")
+        print("=" * 60)
+        print("PIPELINE REPORT")
+        print("=" * 60)
 
-            fp.write(
-                f"Total Products: {result.metrics.total_products}\n"
-            )
+        print(
+            f"Success                 : {result.success}"
+        )
 
-            fp.write(
-                f"Collected: {result.metrics.collected_products}\n"
-            )
+        print(
+            f"Products Collected      : {metrics.products_collected}"
+        )
 
-            fp.write(
-                f"Parsed: {result.metrics.parsed_products}\n"
-            )
+        print(
+            f"Products Parsed         : {metrics.products_parsed}"
+        )
 
-            fp.write(
-                f"Normalized: {result.metrics.normalized_products}\n"
-            )
+        print(
+            f"Products Normalized     : {metrics.products_normalized}"
+        )
 
-            fp.write(
-                f"Semantic: {result.metrics.semantic_products}\n"
-            )
+        print(
+            f"Normalization Changes   : {metrics.normalization_changes}"
+        )
 
-            fp.write(
-                f"Exported: {result.metrics.exported_products}\n"
-            )
+        print(
+            f"Products Enriched       : {metrics.products_enriched}"
+        )
 
-            fp.write(
-                f"Warnings: {result.metrics.warnings}\n"
-            )
+        print(
+            f"Products Exported       : {metrics.products_exported}"
+        )
 
-            fp.write(
-                f"Errors: {result.metrics.total_errors}\n"
-            )
+        print(
+            f"Elapsed Seconds         : {metrics.elapsed_seconds:.3f}"
+        )
 
-            fp.write("\n")
+        if result.exported_files:
 
-            fp.write("PIPELINE STEPS\n")
-            fp.write("-" * 70)
-            fp.write("\n")
+            print("\nExported Files:")
 
-            for step in result.steps:
+            for name, path in result.exported_files.items():
 
-                fp.write(
-                    f"{step.name:<25}"
+                print(
+                    f"  - {name}: {path}"
                 )
 
-                fp.write(
-                    f"{step.status.value:<12}"
+        if result.warnings:
+
+            print("\nWarnings:")
+
+            for warning in result.warnings:
+
+                print(
+                    f"  - {warning}"
                 )
 
-                fp.write(
-                    f"{step.records_processed:>8} registros"
+        if result.errors:
+
+            print("\nErrors:")
+
+            for error in result.errors:
+
+                print(
+                    f"  - {error}"
                 )
 
-                fp.write(
-                    f"   {step.duration_seconds:.3f}s"
-                )
+        print("=" * 60)
 
-                fp.write("\n")
+    # ==========================================================
+    # Utilidades
+    # ==========================================================
 
-            if result.outputs:
+    @staticmethod
+    def has_errors(
+        result: PipelineResult,
+    ) -> bool:
 
-                fp.write("\n")
+        return bool(
+            result.errors,
+        )
 
-                fp.write("OUTPUT FILES\n")
+    @staticmethod
+    def has_warnings(
+        result: PipelineResult,
+    ) -> bool:
 
-                fp.write("-" * 70)
-
-                fp.write("\n")
-
-                for name, path in result.outputs.items():
-
-                    fp.write(
-                        f"{name:<25}{path}\n"
-                    )
-
-            if result.warnings:
-
-                fp.write("\n")
-
-                fp.write("WARNINGS\n")
-
-                fp.write("-" * 70)
-
-                fp.write("\n")
-
-                for warning in result.warnings:
-
-                    fp.write(
-                        f"- {warning}\n"
-                    )
-
-            if result.errors:
-
-                fp.write("\n")
-
-                fp.write("ERRORS\n")
-
-                fp.write("-" * 70)
-
-                fp.write("\n")
-
-                for error in result.errors:
-
-                    fp.write(
-                        f"- {error}\n"
-                    )
-
-            fp.write("\n")
-
-            fp.write("=" * 70)
-
-            fp.write("\n")
-
-            fp.write(
-                "Pipeline finished.\n"
-            )
-
-        return output
+        return bool(
+            result.warnings,
+        )

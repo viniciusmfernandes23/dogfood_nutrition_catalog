@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pandas as pd
 
 from app.normalization.engine import NormalizationEngine
 from app.pipeline.metrics import PipelineMetricsCollector
 from app.pipeline.models import (
+    PipelineConfig,
     PipelineResult,
-    PipelineStatus,
 )
 from app.pipeline.report import PipelineReport
 from app.semantic.engine import SemanticEngine
@@ -17,250 +15,150 @@ from app.warehouse.pipeline import WarehousePipeline
 
 class PipelineOrchestrator:
     """
-    Orquestra todo o fluxo do pipeline.
-
-        Input
-            ↓
-        Normalization
-            ↓
-        Semantic
-            ↓
-        Data Warehouse
-            ↓
-        Reports
+    Orquestra toda a execução do pipeline.
     """
 
     def __init__(
         self,
-        warehouse_output: str = "data/output/warehouse",
-        reports_output: str = "data/output/reports",
+        config: PipelineConfig | None = None,
     ) -> None:
 
-        self.normalizer = NormalizationEngine()
+        self.config = config or PipelineConfig()
 
-        self.semantic = SemanticEngine()
+        self.metrics = PipelineMetricsCollector()
 
-        self.warehouse = WarehousePipeline(
-            output_dir=warehouse_output,
+        self.normalization_engine = NormalizationEngine()
+
+        self.semantic_engine = SemanticEngine()
+
+        self.warehouse_pipeline = WarehousePipeline(
+            output_dir=self.config.warehouse_directory,
         )
 
         self.report = PipelineReport(
-            output_dir=reports_output,
+            output_dir=self.config.output_directory,
         )
 
-        self.metrics = PipelineMetricsCollector()
+    # ==========================================================
+    # Pipeline
+    # ==========================================================
 
     def run(
         self,
         dataframe: pd.DataFrame,
     ) -> PipelineResult:
 
-        result = PipelineResult()
+        self.metrics.reset()
 
-        self.metrics.start_pipeline()
+        self.metrics.start()
 
-        result.status = PipelineStatus.RUNNING
+        result = PipelineResult(
+
+            success=True,
+
+            metrics=self.metrics.metrics,
+
+        )
 
         try:
 
-            self.metrics.update_total_products(
-                len(dataframe)
+            # ----------------------------------------------
+            # Coleta
+            # ----------------------------------------------
+
+            self.metrics.set_collected(
+                len(dataframe),
             )
 
-            # -------------------------------------------------
-            # Normalization
-            # -------------------------------------------------
+            # ----------------------------------------------
+            # Parser
+            # ----------------------------------------------
 
-            step = self.metrics.start_step(
-                "Normalization"
+            self.metrics.set_parsed(
+                len(dataframe),
             )
+
+            # ----------------------------------------------
+            # Normalização
+            # ----------------------------------------------
 
             normalized_df, normalization_report = (
-                self.normalizer.normalize_dataframe(
-                    dataframe
+                self.normalization_engine.normalize_dataframe(
+                    dataframe,
                 )
             )
 
-            self.metrics.update_normalization(
-                len(normalized_df)
+            self.metrics.set_normalized(
+                len(normalized_df),
             )
 
-            result.add_step(
-
-                self.metrics.finish_step(
-
-                    step,
-
-                    records_processed=len(
-                        normalized_df
-                    ),
-
-                    metadata={
-                        "changed_records":
-                        normalization_report.changed_records,
-
-                        "manual_review":
-                        normalization_report.manual_review_records,
-
-                        "auto_corrected":
-                        normalization_report.auto_corrected_records,
-
-                    },
-
-                )
-
+            self.metrics.set_normalization_changes(
+                normalization_report.auto_corrected_records,
             )
 
-            # -------------------------------------------------
-            # Semantic
-            # -------------------------------------------------
+            # ----------------------------------------------
+            # Enriquecimento Semântico
+            # ----------------------------------------------
 
-            step = self.metrics.start_step(
-                "Semantic"
+            semantic_df = self.semantic_engine.enrich_dataframe(
+                normalized_df,
             )
 
-            semantic_df = self.semantic.enrich_dataframe(
-                normalized_df
+            self.metrics.set_enriched(
+                len(semantic_df),
             )
 
-            self.metrics.update_semantic(
-                len(semantic_df)
-            )
-
-            result.add_step(
-
-                self.metrics.finish_step(
-
-                    step,
-
-                    records_processed=len(
-                        semantic_df
-                    ),
-
-                )
-
-            )
-
-            # -------------------------------------------------
+            # ----------------------------------------------
             # Warehouse
-            # -------------------------------------------------
+            # ----------------------------------------------
 
-            step = self.metrics.start_step(
-                "Warehouse"
+            tables, exported = self.warehouse_pipeline.run(
+                semantic_df,
             )
 
-            tables = self.warehouse.run(
-                semantic_df
-            )
+            result.exported_files = exported
 
-            exported_rows = sum(
-
-                len(df)
-
-                for df
-
-                in tables.values()
-
-            )
-
-            self.metrics.update_export(
-                exported_rows
-            )
-
-            result.add_step(
-
-                self.metrics.finish_step(
-
-                    step,
-
-                    records_processed=exported_rows,
-
+            self.metrics.set_exported(
+                len(
+                    tables["dim_product"],
                 )
-
             )
-
-            # -------------------------------------------------
-            # Outputs
-            # -------------------------------------------------
-
-            warehouse_dir = Path(
-                self.warehouse.exporter.output_dir
-            )
-
-            for file in warehouse_dir.glob("*.csv"):
-
-                result.add_output(
-                    file.stem,
-                    str(file),
-                )
-
-            metadata = (
-                warehouse_dir
-                / "warehouse_metadata.json"
-            )
-
-            if metadata.exists():
-
-                result.add_output(
-                    "warehouse_metadata",
-                    str(metadata),
-                )
-
-            # -------------------------------------------------
-            # Finalização
-            # -------------------------------------------------
-
-            result.metrics = self.metrics.finish_pipeline()
-
-            result.status = PipelineStatus.SUCCESS
-
-            self.report.export(
-                result
-            )
-
-            return result
 
         except Exception as exc:
 
-            result.status = PipelineStatus.FAILED
-
             result.add_error(
-                str(exc)
+                str(exc),
             )
 
-            result.metrics = (
-                self.metrics.finish_pipeline()
-            )
+        finally:
 
-            self.report.export(
-                result
-            )
+            self.metrics.finish()
 
-            return result
+            result.metrics = self.metrics.snapshot()
 
-    def run_from_csv(
+            if self.config.save_logs:
+
+                self.report.save_json(
+                    result,
+                )
+
+        return result
+
+    # ==========================================================
+    # Utilidades
+    # ==========================================================
+
+    def print_report(
         self,
-        input_file: str | Path,
-    ) -> PipelineResult:
+        result: PipelineResult,
+    ) -> None:
 
-        dataframe = pd.read_csv(
-            input_file,
-            low_memory=False,
+        self.report.print_summary(
+            result,
         )
 
-        return self.run(
-            dataframe
-        )
-
-    def run_from_parquet(
+    def clean_output(
         self,
-        input_file: str | Path,
-    ) -> PipelineResult:
+    ) -> None:
 
-        dataframe = pd.read_parquet(
-            input_file
-        )
-
-        return self.run(
-            dataframe
-        )
+        self.warehouse_pipeline.clean()

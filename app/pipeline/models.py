@@ -1,160 +1,99 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 
-class PipelineStatus(str, Enum):
-    PENDING = "pending"
-    RUNNING = "running"
-    SUCCESS = "success"
-    FAILED = "failed"
-    SKIPPED = "skipped"
-
-
 @dataclass(slots=True)
-class PipelineStep:
+class PipelineConfig:
     """
-    Representa uma etapa do pipeline.
+    Configuração da execução do pipeline.
     """
 
-    name: str
+    input_url: str | None = None
 
-    status: PipelineStatus = PipelineStatus.PENDING
+    output_directory: str = "data/output"
 
-    started_at: datetime | None = None
+    warehouse_directory: str = "data/output/warehouse"
 
-    finished_at: datetime | None = None
+    overwrite: bool = True
 
-    duration_seconds: float = 0.0
+    export_csv: bool = True
 
-    records_processed: int = 0
-
-    errors: int = 0
-
-    message: str | None = None
-
-    metadata: dict[str, Any] = field(
-        default_factory=dict,
-    )
+    save_logs: bool = True
 
     def to_dict(self) -> dict[str, Any]:
 
-        return {
-
-            "name": self.name,
-
-            "status": self.status.value,
-
-            "started_at": (
-                self.started_at.isoformat()
-                if self.started_at
-                else None
-            ),
-
-            "finished_at": (
-                self.finished_at.isoformat()
-                if self.finished_at
-                else None
-            ),
-
-            "duration_seconds": self.duration_seconds,
-
-            "records_processed": self.records_processed,
-
-            "errors": self.errors,
-
-            "message": self.message,
-
-            "metadata": self.metadata,
-
-        }
+        return asdict(self)
 
 
 @dataclass(slots=True)
 class PipelineMetrics:
     """
-    Métricas globais da execução.
+    Métricas consolidadas da execução.
     """
 
-    total_products: int = 0
+    products_collected: int = 0
 
-    collected_products: int = 0
+    products_parsed: int = 0
 
-    parsed_products: int = 0
+    products_normalized: int = 0
 
-    normalized_products: int = 0
+    products_enriched: int = 0
 
-    semantic_products: int = 0
+    products_exported: int = 0
 
-    exported_products: int = 0
+    normalization_changes: int = 0
 
-    total_errors: int = 0
-
-    warnings: int = 0
-
-    execution_time_seconds: float = 0.0
+    elapsed_seconds: float = 0.0
 
     started_at: datetime | None = None
 
     finished_at: datetime | None = None
 
+    def start(self) -> None:
+
+        self.started_at = datetime.now(
+            UTC,
+        )
+
+    def finish(self) -> None:
+
+        self.finished_at = datetime.now(
+            UTC,
+        )
+
+        if self.started_at is not None:
+
+            self.elapsed_seconds = round(
+
+                (
+                    self.finished_at
+                    - self.started_at
+                ).total_seconds(),
+
+                3,
+
+            )
+
     def to_dict(self) -> dict[str, Any]:
 
-        return {
-
-            "total_products": self.total_products,
-
-            "collected_products": self.collected_products,
-
-            "parsed_products": self.parsed_products,
-
-            "normalized_products": self.normalized_products,
-
-            "semantic_products": self.semantic_products,
-
-            "exported_products": self.exported_products,
-
-            "total_errors": self.total_errors,
-
-            "warnings": self.warnings,
-
-            "execution_time_seconds": self.execution_time_seconds,
-
-            "started_at": (
-                self.started_at.isoformat()
-                if self.started_at
-                else None
-            ),
-
-            "finished_at": (
-                self.finished_at.isoformat()
-                if self.finished_at
-                else None
-            ),
-
-        }
+        return asdict(self)
 
 
 @dataclass(slots=True)
 class PipelineResult:
     """
-    Resultado completo da execução.
+    Resultado final do pipeline.
     """
 
-    status: PipelineStatus = PipelineStatus.PENDING
+    success: bool
 
-    metrics: PipelineMetrics = field(
-        default_factory=PipelineMetrics,
-    )
+    metrics: PipelineMetrics
 
-    steps: list[PipelineStep] = field(
-        default_factory=list,
-    )
-
-    outputs: dict[str, str] = field(
+    exported_files: dict[str, Path] = field(
         default_factory=dict,
     )
 
@@ -166,68 +105,43 @@ class PipelineResult:
         default_factory=list,
     )
 
-    def add_step(
-        self,
-        step: PipelineStep,
-    ) -> None:
-
-        self.steps.append(step)
-
     def add_error(
         self,
         message: str,
     ) -> None:
 
-        self.errors.append(message)
+        self.errors.append(
+            message,
+        )
 
-        self.metrics.total_errors += 1
+        self.success = False
 
     def add_warning(
         self,
         message: str,
     ) -> None:
 
-        self.warnings.append(message)
-
-        self.metrics.warnings += 1
-
-    def add_output(
-        self,
-        name: str,
-        path: str,
-    ) -> None:
-
-        self.outputs[name] = path
-
-    @property
-    def success(self) -> bool:
-
-        return self.status == PipelineStatus.SUCCESS
-
-    @property
-    def failed(self) -> bool:
-
-        return self.status == PipelineStatus.FAILED
+        self.warnings.append(
+            message,
+        )
 
     def to_dict(self) -> dict[str, Any]:
 
         return {
 
-            "status": self.status.value,
+            "success": self.success,
 
             "metrics": self.metrics.to_dict(),
 
-            "steps": [
+            "exported_files": {
 
-                step.to_dict()
+                name: str(path)
 
-                for step
+                for name, path
 
-                in self.steps
+                in self.exported_files.items()
 
-            ],
-
-            "outputs": self.outputs,
+            },
 
             "errors": self.errors,
 
