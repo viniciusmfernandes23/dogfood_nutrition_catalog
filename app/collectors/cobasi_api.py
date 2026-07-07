@@ -8,15 +8,17 @@ from app.core.config import settings
 from app.core.constants import API_URL
 from app.core.logging import logger
 
-CATEGORY_IDS = [
-
-    1000001,
-    1000002,
-    1000010,
-    1000011,
-    1000012,
-    1000013,
-
+# Categorias de ração e petiscos para cães na Cobasi.
+# Formato: (path_da_url, map_vtex, id_categoria, nome_legivel)
+# A API VTEX da Cobasi exige o path de navegação + parâmetro map=c,c[,c]
+# para filtrar por subcategoria. O fq=C:ID isolado não funciona para
+# subcategorias — apenas para o departamento raiz.
+CATEGORY_PATHS = [
+    ("cachorro/racao/racao-seca",          "c,c,c", 1001436, "Ração Seca"),
+    ("cachorro/racao/racao-umida",         "c,c,c", 1001437, "Ração Úmida"),
+    ("cachorro/racao/racao-medicamentosa", "c,c,c", 1001438, "Ração Medicamentosa"),
+    ("cachorro/racao/racao-natural",       "c,c,c", 1001617, "Ração Natural"),
+    ("cachorro/petiscos",                  "c,c",   1001427, "Petiscos"),
 ]
 
 
@@ -28,12 +30,15 @@ class CobasiAPICollector:
 
     def fetch_category(
         self,
+        path: str,
+        map_param: str,
         category_id: int,
     ) -> list[ProductCollection]:
 
         logger.info(
-            "Coletando categoria %s",
+            "Coletando categoria %s (%s)",
             category_id,
+            path,
         )
 
         start = 0
@@ -45,10 +50,10 @@ class CobasiAPICollector:
             end = start + settings.page_size - 1
 
             url = (
-                f"{API_URL}"
-                f"?fq=C:{category_id}"
-                f"&_from={start}"
+                f"{API_URL}/{path}"
+                f"?_from={start}"
                 f"&_to={end}"
+                f"&map={map_param}"
             )
 
             response = self.client.get(url)
@@ -72,9 +77,13 @@ class CobasiAPICollector:
                 )
 
             logger.info(
-                "%s produtos coletados",
+                "%s produtos coletados em %s",
                 len(results),
+                path,
             )
+
+            if len(data) < settings.page_size:
+                break
 
             start += settings.page_size
 
@@ -86,10 +95,10 @@ class CobasiAPICollector:
 
         products = []
 
-        for category in CATEGORY_IDS:
+        for path, map_param, category_id, _ in CATEGORY_PATHS:
 
             products.extend(
-                self.fetch_category(category)
+                self.fetch_category(path, map_param, category_id)
             )
 
         return self.remove_duplicates(products)

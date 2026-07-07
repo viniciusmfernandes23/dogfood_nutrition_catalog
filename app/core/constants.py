@@ -23,7 +23,9 @@ for directory in (
 ):
     directory.mkdir(parents=True, exist_ok=True)
 
-API_URL = "https://www.cobasi.com.br/api/catalog_system/pub/products/search"
+API_URL = "https://www.cobasi.com.br/api/catalog_system/pub/products/search"  # noqa: E501
+# Nota: a API VTEX da Cobasi exige path de navegação + map=c,c[,c]
+# para filtrar subcategorias. O parâmetro fq=C:ID só funciona no departamento raiz.
 
 PAGE_SIZE = 50
 
