@@ -1,24 +1,34 @@
 from __future__ import annotations
-from typing import Iterable, Sequence
+
+from collections.abc import Iterable, Sequence
 
 import pandas as pd
 
-from app.normalization.models import DatasetNormalizationReport, NormalizationLog
-from app.normalization.resolver import NormalizationResolver
-from app.normalization.rules import NORMALIZABLE_FIELDS, get_rule
+from app.normalization.models import (
+    DatasetNormalizationReport,
+    NormalizationLog,
+    ValidationStatus,
+)
+from app.normalization.resolver import Resolver
+from app.normalization.rules import (
+    NORMALIZABLE_FIELDS,
+    get_rule,
+)
 
 
 class NormalizationEngine:
     """
-    Aplica a Rule Engine de normalização em DataFrames e Series.
+    Engine responsável por aplicar a normalização
+    dos nutrientes em DataFrames e Series.
     """
 
     def __init__(self) -> None:
-        self.resolver = NormalizationResolver()
 
-    # ============================================================
-    # Core interno reutilizável
-    # ============================================================
+        self.resolver = Resolver()
+
+    # ==========================================================
+    # Core
+    # ==========================================================
 
     def _normalize_fields(
         self,
@@ -30,144 +40,328 @@ class NormalizationEngine:
         product_id_column: str,
     ) -> None:
 
-        product_id = row.get(product_id_column, -1)
+        product_id = row.get(
+            product_id_column,
+            -1,
+        )
+
         row_changed = False
 
         for field in fields:
+
             rule = get_rule(field)
-            result = self.resolver.resolve(value=row[field], rule=rule)
 
-            df.at[index, field] = result.normalized_value
+            if rule is None:
+                continue
 
-            report.add_log(
-                NormalizationLog(
-                    product_id=product_id,
-                    field=field,
-                    original_value=result.original_value,
-                    normalized_value=result.normalized_value,
-                    rule_applied=result.rule_applied,
-                    status=result.status,
-                )
+            result = self.resolver.resolve_value(
+                value=row.get(field),
+                rule=rule,
             )
 
-            self._update_statistics(report, result.status)
+            df.at[
+                index,
+                field,
+            ] = result.normalized_value
+
+            report.add_log(
+
+                NormalizationLog(
+
+                    product_id=product_id,
+
+                    field=field,
+
+                    original_value=result.original_value,
+
+                    normalized_value=result.normalized_value,
+
+                    rule_applied=result.rule_applied,
+
+                    status=result.status,
+
+                )
+
+            )
+
+            self._update_statistics(
+                report,
+                result.status,
+            )
 
             if result.changed:
                 row_changed = True
 
         if row_changed:
+
             report.changed_records += 1
+
         else:
+
             report.unchanged_records += 1
 
-    # ============================================================
-    # Normalização de DataFrame completo
-    # ============================================================
+    # ==========================================================
+    # DataFrame
+    # ==========================================================
 
     def normalize_dataframe(
         self,
         df: pd.DataFrame,
         product_id_column: str = "product_id",
-    ) -> tuple[pd.DataFrame, DatasetNormalizationReport]:
+    ) -> tuple[
+        pd.DataFrame,
+        DatasetNormalizationReport,
+    ]:
 
         df = df.copy()
+
         report = DatasetNormalizationReport()
 
-        fields = [f for f in NORMALIZABLE_FIELDS if f in df.columns]
+        fields = [
+
+            field
+
+            for field
+
+            in NORMALIZABLE_FIELDS
+
+            if field in df.columns
+
+        ]
 
         for index, row in df.iterrows():
+
             report.processed_records += 1
+
             self._normalize_fields(
-                df,
-                index,
-                row,
-                fields,
-                report,
-                product_id_column,
+
+                df=df,
+
+                index=index,
+
+                row=row,
+
+                fields=fields,
+
+                report=report,
+
+                product_id_column=product_id_column,
+
             )
 
-        return df, report
+        return (
 
-    # ============================================================
-    # Normalização de colunas específicas
-    # ============================================================
+            df,
+
+            report,
+
+        )
+
+    # ==========================================================
+    # Colunas específicas
+    # ==========================================================
 
     def normalize_columns(
         self,
         df: pd.DataFrame,
         columns: Iterable[str] | None = None,
         product_id_column: str = "product_id",
-    ) -> tuple[pd.DataFrame, DatasetNormalizationReport]:
+    ) -> tuple[
+        pd.DataFrame,
+        DatasetNormalizationReport,
+    ]:
 
         df = df.copy()
+
         report = DatasetNormalizationReport()
 
-        fields = (
-            [c for c in columns if c in df.columns]
-            if columns is not None
-            else [f for f in NORMALIZABLE_FIELDS if f in df.columns]
-        )
+        if columns is None:
+
+            fields = [
+
+                field
+
+                for field
+
+                in NORMALIZABLE_FIELDS
+
+                if field in df.columns
+
+            ]
+
+        else:
+
+            fields = [
+
+                field
+
+                for field
+
+                in columns
+
+                if field in df.columns
+
+            ]
 
         for index, row in df.iterrows():
+
             report.processed_records += 1
+
             self._normalize_fields(
-                df,
-                index,
-                row,
-                fields,
-                report,
-                product_id_column,
+
+                df=df,
+
+                index=index,
+
+                row=row,
+
+                fields=fields,
+
+                report=report,
+
+                product_id_column=product_id_column,
+
             )
 
-        return df, report
+        return (
 
-    # ============================================================
-    # Normalização de Series
-    # ============================================================
+            df,
 
-    def normalize_series(self, series: pd.Series, field: str) -> pd.Series:
-        rule = get_rule(field)
-        return pd.Series(
-            [
-                self.resolver.resolve(value=v, rule=rule).normalized_value
-                for v in series
-            ],
-            index=series.index,
+            report,
+
         )
 
-    # ============================================================
+    # ==========================================================
+    # Series
+    # ==========================================================
+
+    def normalize_series(
+        self,
+        series: pd.Series,
+        field: str,
+    ) -> pd.Series:
+
+        rule = get_rule(field)
+
+        if rule is None:
+
+            return series.copy()
+
+        return pd.Series(
+
+            [
+
+                self.resolver.resolve_value(
+
+                    value=value,
+
+                    rule=rule,
+
+                ).normalized_value
+
+                for value
+
+                in series
+
+            ],
+
+            index=series.index,
+
+            dtype=series.dtype,
+
+        )
+
+    # ==========================================================
     # Estatísticas
-    # ============================================================
+    # ==========================================================
 
     @staticmethod
-    def _update_statistics(report: DatasetNormalizationReport, status: str) -> None:
-        if status == "normalized":
+    def _update_statistics(
+        report: DatasetNormalizationReport,
+        status: ValidationStatus,
+    ) -> None:
+
+        if status == ValidationStatus.NORMALIZED:
             return
 
-        if status == "auto_corrected":
+        if status == ValidationStatus.AUTO_CORRECTED:
+
             report.auto_corrected_records += 1
-        elif status == "manual_review":
+
+        elif status == ValidationStatus.REVIEW:
+
             report.manual_review_records += 1
-        elif status == "ambiguous":
+
+        elif status == ValidationStatus.AMBIGUOUS:
+
             report.ambiguous_records += 1
-        elif status == "implausible":
+
+        elif status == ValidationStatus.IMPLAUSIBLE:
+
             report.implausible_records += 1
 
-    # ============================================================
-    # Logs e resumo
-    # ============================================================
+    # ==========================================================
+    # Exportações
+    # ==========================================================
 
-    def generate_logs_dataframe(self, report: DatasetNormalizationReport) -> pd.DataFrame:
-        return pd.DataFrame([vars(log) for log in report.logs])
+    @staticmethod
+    def generate_logs_dataframe(
+        report: DatasetNormalizationReport,
+    ) -> pd.DataFrame:
 
-    def generate_summary(self, report: DatasetNormalizationReport) -> dict:
+        if not report.logs:
+
+            return pd.DataFrame()
+
+        return pd.DataFrame(
+
+            [
+
+                {
+
+                    "product_id": log.product_id,
+
+                    "field": log.field,
+
+                    "original_value": log.original_value,
+
+                    "normalized_value": log.normalized_value,
+
+                    "rule_applied": log.rule_applied,
+
+                    "status": log.status.value,
+
+                }
+
+                for log
+
+                in report.logs
+
+            ]
+
+        )
+
+    @staticmethod
+    def generate_summary(
+        report: DatasetNormalizationReport,
+    ) -> dict[str, int | float]:
+
         return {
+
             "processed_records": report.processed_records,
+
             "changed_records": report.changed_records,
+
             "unchanged_records": report.unchanged_records,
+
             "auto_corrected_records": report.auto_corrected_records,
+
             "manual_review_records": report.manual_review_records,
+
             "ambiguous_records": report.ambiguous_records,
+
             "implausible_records": report.implausible_records,
+
             "success_rate": report.success_rate,
+
         }

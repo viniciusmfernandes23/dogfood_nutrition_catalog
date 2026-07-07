@@ -1,13 +1,22 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from enum import Enum
+
+
+class ValidationStatus(str, Enum):
+    NORMALIZED = "normalized"
+    AUTO_CORRECTED = "auto_corrected"
+    REVIEW = "review"
+    AMBIGUOUS = "ambiguous"
+    IMPLAUSIBLE = "implausible"
+    MISSING = "missing"
 
 
 @dataclass(slots=True, frozen=True)
 class NormalizationRule:
     """
-    Define todas as regras de normalização para um nutriente.
+    Regra utilizada durante a normalização.
     """
 
     field: str
@@ -26,6 +35,30 @@ class NormalizationRule:
 
 
 @dataclass(slots=True)
+class NormalizedNutrient:
+    """
+    Nutriente normalizado utilizado pelo Validator,
+    Resolver e testes.
+    """
+
+    name: str
+
+    value: float | None
+
+    unit: str
+
+    original_value: float | None = None
+
+    original_unit: str | None = None
+
+    status: ValidationStatus = ValidationStatus.NORMALIZED
+
+    confidence: float = 1.0
+
+    rule_applied: str | None = None
+
+
+@dataclass(slots=True)
 class NormalizationResult:
     """
     Resultado da normalização de um único valor.
@@ -39,7 +72,7 @@ class NormalizationResult:
 
     rule_applied: str | None
 
-    status: str
+    status: ValidationStatus
 
     confidence: float
 
@@ -49,26 +82,26 @@ class NormalizationResult:
 @dataclass(slots=True)
 class NormalizationLog:
     """
-    Registro completo da alteração realizada.
+    Registro de alteração aplicada.
     """
 
     product_id: int
 
     field: str
 
-    original_value: float |None
+    original_value: float | None
 
-    normalized_value: float |None
+    normalized_value: float | None
 
-    rule_applied: str |None
+    rule_applied: str | None
 
-    status: str
+    status: ValidationStatus
 
 
 @dataclass(slots=True)
 class DatasetNormalizationReport:
     """
-    Estatísticas globais da normalização.
+    Estatísticas consolidadas da normalização.
     """
 
     processed_records: int = 0
@@ -85,7 +118,9 @@ class DatasetNormalizationReport:
 
     auto_corrected_records: int = 0
 
-    logs: list[NormalizationLog] = field(default_factory=list)
+    logs: list[NormalizationLog] = field(
+        default_factory=list,
+    )
 
     def add_log(
         self,
@@ -95,18 +130,18 @@ class DatasetNormalizationReport:
         self.logs.append(log)
 
     @property
-    def success_rate(self) -> float:
+    def success_rate(
+        self,
+    ) -> float:
 
         if self.processed_records == 0:
-
             return 0.0
 
         return round(
-
-            self.auto_corrected_records
-            / self.processed_records
+            (
+                self.auto_corrected_records
+                / self.processed_records
+            )
             * 100,
-
             2,
-
         )

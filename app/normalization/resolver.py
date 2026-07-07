@@ -3,22 +3,17 @@ from __future__ import annotations
 from app.normalization.models import (
     NormalizationResult,
     NormalizationRule,
+    NormalizedNutrient,
+    ValidationStatus,
 )
 from app.normalization.rules import (
     GKG_TO_MGKG_FACTOR,
-    RULE_CONFIDENCE,
-    STATUS_AMBIGUOUS,
-    STATUS_AUTO_CORRECTED,
-    STATUS_IMPLAUSIBLE,
-    STATUS_MANUAL_REVIEW,
-    STATUS_NORMALIZED,
+    get_confidence,
 )
-from app.normalization.validator import (
-    NormalizationValidator,
-)
+from app.normalization.validator import Validator
 
 
-class NormalizationResolver:
+class Resolver:
     """
     Resolve automaticamente problemas de escala
     utilizando as regras definidas para cada nutriente.
@@ -26,33 +21,44 @@ class NormalizationResolver:
 
     def __init__(self) -> None:
 
-        self.validator = NormalizationValidator()
+        self.validator = Validator()
 
     def resolve(
         self,
-        value: float | None,
-        rule: NormalizationRule,
-    ) -> NormalizationResult:
+        nutrient: NormalizedNutrient,
+        rule: NormalizationRule | None = None,
+    ) -> NormalizedNutrient:
 
-        if self.validator.is_null(value):
+        if nutrient.value is None:
 
-            return self._null_result(rule)
+            nutrient.status = ValidationStatus.MISSING
 
-        if self.validator.is_valid(value, rule):
+            nutrient.confidence = 0.0
 
-            return NormalizationResult(
-                field=rule.field,
-                original_value=value,
-                normalized_value=value,
-                rule_applied="already_normalized",
-                status=STATUS_NORMALIZED,
-                confidence=RULE_CONFIDENCE["already_normalized"],
-                changed=False,
+            return nutrient
+
+        if rule is None:
+
+            return nutrient
+
+        if self.validator.is_valid(
+            nutrient.value,
+            rule,
+        ):
+
+            nutrient.status = ValidationStatus.NORMALIZED
+
+            nutrient.rule_applied = "already_normalized"
+
+            nutrient.confidence = get_confidence(
+                "already_normalized",
             )
 
+            return nutrient
+
         candidates = self._build_candidates(
-            value=value,
-            rule=rule,
+            nutrient.value,
+            rule,
         )
 
         candidates = self.validator.validate_candidates(
@@ -60,115 +66,172 @@ class NormalizationResolver:
             rule,
         )
 
-        if self.validator.has_single_candidate(candidates):
+        if self.validator.has_single_candidate(
+            candidates,
+        ):
 
-            normalized_value, applied_rule = candidates[0]
+            value, applied_rule = candidates[0]
 
-            return NormalizationResult(
-                field=rule.field,
-                original_value=value,
-                normalized_value=normalized_value,
-                rule_applied=applied_rule,
-                status=STATUS_AUTO_CORRECTED,
-                confidence=RULE_CONFIDENCE[applied_rule],
-                changed=True,
+            nutrient.original_value = nutrient.value
+
+            nutrient.value = value
+
+            nutrient.status = (
+                ValidationStatus.AUTO_CORRECTED
             )
 
-        if self.validator.has_multiple_candidates(candidates):
+            nutrient.rule_applied = applied_rule
 
-            return NormalizationResult(
-                field=rule.field,
-                original_value=value,
-                normalized_value=value,
-                rule_applied="ambiguous",
-                status=STATUS_AMBIGUOUS,
-                confidence=RULE_CONFIDENCE["ambiguous"],
-                changed=False,
+            nutrient.confidence = get_confidence(
+                applied_rule,
             )
+
+            return nutrient
+
+        if self.validator.has_multiple_candidates(
+            candidates,
+        ):
+
+            nutrient.status = (
+                ValidationStatus.AMBIGUOUS
+            )
+
+            nutrient.rule_applied = "ambiguous"
+
+            nutrient.confidence = get_confidence(
+                "ambiguous",
+            )
+
+            return nutrient
+
+        nutrient.status = (
+            ValidationStatus.IMPLAUSIBLE
+        )
+
+        nutrient.rule_applied = "implausible"
+
+        nutrient.confidence = get_confidence(
+            "implausible",
+        )
+
+        return nutrient
+
+    def resolve_value(
+        self,
+        value: float | None,
+        rule: NormalizationRule,
+    ) -> NormalizationResult:
+        """
+        Compatibilidade com o engine legado.
+        """
+
+        nutrient = NormalizedNutrient(
+
+            name=rule.field,
+
+            value=value,
+
+            unit=(
+                "mg/kg"
+                if rule.field.endswith("_mgkg")
+                else "g/kg"
+            ),
+
+        )
+
+        nutrient = self.resolve(
+            nutrient,
+            rule,
+        )
 
         return NormalizationResult(
+
             field=rule.field,
-            original_value=value,
-            normalized_value=value,
-            rule_applied="implausible",
-            status=STATUS_IMPLAUSIBLE,
-            confidence=RULE_CONFIDENCE["implausible"],
-            changed=False,
+
+            original_value=nutrient.original_value,
+
+            normalized_value=nutrient.value,
+
+            rule_applied=nutrient.rule_applied,
+
+            status=nutrient.status,
+
+            confidence=nutrient.confidence,
+
+            changed=(
+                nutrient.original_value
+                != nutrient.value
+                if nutrient.original_value is not None
+                else False
+            ),
+
         )
 
     def _build_candidates(
         self,
         value: float,
         rule: NormalizationRule,
-    ) -> list[tuple[float, str]]:
+    ) -> list[
+        tuple[float, str]
+    ]:
 
-        candidates: list[tuple[float, str]] = []
-
-        # --------------------------------------------------
-        # Overscale
-        # --------------------------------------------------
+        candidates: list[
+            tuple[float, str]
+        ] = []
 
         if rule.overscale_factor:
 
             candidates.append(
+
                 (
-                    value / rule.overscale_factor,
+                    value
+                    / rule.overscale_factor,
+
                     "overscale",
                 )
-            )
 
-        # --------------------------------------------------
-        # Decimal Shift
-        # --------------------------------------------------
+            )
 
         if rule.decimal_shift_factor:
 
             candidates.append(
+
                 (
-                    value * rule.decimal_shift_factor,
+                    value
+                    * rule.decimal_shift_factor,
+
                     "decimal_shift",
                 )
-            )
 
-        # --------------------------------------------------
-        # Percent
-        # --------------------------------------------------
+            )
 
         if rule.percent_factor:
 
             candidates.append(
+
                 (
-                    value * rule.percent_factor,
+                    value
+                    * rule.percent_factor,
+
                     "percent_conversion",
                 )
-            )
 
-        # --------------------------------------------------
-        # g/kg -> mg/kg
-        # --------------------------------------------------
+            )
 
         if rule.gkg_to_mgkg:
 
             candidates.append(
+
                 (
-                    value * GKG_TO_MGKG_FACTOR,
+                    value
+                    * GKG_TO_MGKG_FACTOR,
+
                     "gkg_to_mgkg",
                 )
+
             )
 
         return candidates
 
-    @staticmethod
-    def _null_result(
-        rule: NormalizationRule,
-    ) -> NormalizationResult:
 
-        return NormalizationResult(
-            field=rule.field,
-            original_value=None,
-            normalized_value=None,
-            rule_applied=None,
-            status=STATUS_MANUAL_REVIEW,
-            confidence=0.0,
-            changed=False,
-        )
+NormalizationResolver = Resolver

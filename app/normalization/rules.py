@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from app.normalization.models import NormalizationRule
-
+from app.normalization.models import (
+    NormalizationRule,
+    ValidationStatus,
+)
 
 # ==========================================================
 # Fatores de conversão
@@ -141,28 +143,13 @@ NORMALIZABLE_FIELDS = tuple(NORMALIZATION_RULES.keys())
 
 
 # ==========================================================
-# Status possíveis
-# ==========================================================
-
-STATUS_NORMALIZED = "normalized"
-
-STATUS_AUTO_CORRECTED = "auto_corrected"
-
-STATUS_MANUAL_REVIEW = "manual_review"
-
-STATUS_AMBIGUOUS = "ambiguous"
-
-STATUS_IMPLAUSIBLE = "implausible"
-
-
-# ==========================================================
 # Prioridade das regras
 #
 # Quanto menor o índice,
 # maior a prioridade.
 # ==========================================================
 
-RULE_PRIORITY = (
+RULE_PRIORITY = [
 
     "already_normalized",
 
@@ -174,7 +161,7 @@ RULE_PRIORITY = (
 
     "gkg_to_mgkg",
 
-)
+]
 
 
 # ==========================================================
@@ -195,6 +182,8 @@ RULE_CONFIDENCE = {
 
     "ambiguous": 0.40,
 
+    "missing": 0.00,
+
     "implausible": 0.00,
 
 }
@@ -206,20 +195,23 @@ RULE_CONFIDENCE = {
 
 QUALITY_STATUS = {
 
-    STATUS_NORMALIZED:
+    ValidationStatus.NORMALIZED:
         "Normalizado",
 
-    STATUS_AUTO_CORRECTED:
+    ValidationStatus.AUTO_CORRECTED:
         "Corrigido automaticamente",
 
-    STATUS_MANUAL_REVIEW:
+    ValidationStatus.REVIEW:
         "Requer revisão manual",
 
-    STATUS_AMBIGUOUS:
+    ValidationStatus.AMBIGUOUS:
         "Ambíguo",
 
-    STATUS_IMPLAUSIBLE:
+    ValidationStatus.IMPLAUSIBLE:
         "Implausível",
+
+    ValidationStatus.MISSING:
+        "Sem informação",
 
 }
 
@@ -228,23 +220,72 @@ QUALITY_STATUS = {
 # Helpers
 # ==========================================================
 
-def get_rule(field: str) -> NormalizationRule:
+def get_rule(
+    field: str,
+) -> NormalizationRule | None:
     """
-    Retorna a regra de normalização
-    correspondente ao campo.
+    Retorna a regra de normalização do campo.
     """
-    return NORMALIZATION_RULES[field]
+
+    return NORMALIZATION_RULES.get(field)
 
 
-def is_macro(field: str) -> bool:
+def has_rule(
+    field: str,
+) -> bool:
     """
-    Verifica se o campo é um macronutriente.
+    Verifica se existe regra de normalização
+    para o campo informado.
     """
+
+    return field in NORMALIZATION_RULES
+
+
+def is_macro(
+    field: str,
+) -> bool:
+    """
+    Verifica se o campo pertence ao grupo
+    dos macronutrientes.
+    """
+
     return field in MACRONUTRIENTS
 
 
-def is_mineral(field: str) -> bool:
+def is_mineral(
+    field: str,
+) -> bool:
     """
-    Verifica se o campo é um mineral.
+    Verifica se o campo pertence ao grupo
+    dos minerais.
     """
+
     return field in MINERALS
+
+
+def get_confidence(
+    rule_name: str,
+) -> float:
+    """
+    Retorna a confiança associada
+    à regra aplicada.
+    """
+
+    return RULE_CONFIDENCE.get(
+        rule_name,
+        0.0,
+    )
+
+
+def quality_label(
+    status: ValidationStatus,
+) -> str:
+    """
+    Retorna a descrição amigável
+    do status de qualidade.
+    """
+
+    return QUALITY_STATUS.get(
+        status,
+        "Desconhecido",
+    )

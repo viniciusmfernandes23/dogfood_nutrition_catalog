@@ -8,7 +8,7 @@ from app.normalization.rules import GKG_TO_MGKG_FACTOR
 
 class BaseTransform(ABC):
     """
-    Classe base para todas as transformações.
+    Classe base para todas as transformações de normalização.
     """
 
     name: str
@@ -19,7 +19,10 @@ class BaseTransform(ABC):
         value: float,
         rule: NormalizationRule,
     ) -> list[tuple[float, str]]:
-        ...
+        """
+        Retorna uma lista de candidatos para normalização.
+        """
+        raise NotImplementedError
 
 
 class OverscaleTransform(BaseTransform):
@@ -32,12 +35,14 @@ class OverscaleTransform(BaseTransform):
         rule: NormalizationRule,
     ) -> list[tuple[float, str]]:
 
-        if rule.overscale_factor is None:
+        factor = rule.overscale_factor
+
+        if factor is None:
             return []
 
         return [
             (
-                value / rule.overscale_factor,
+                value / factor,
                 self.name,
             )
         ]
@@ -53,12 +58,14 @@ class DecimalShiftTransform(BaseTransform):
         rule: NormalizationRule,
     ) -> list[tuple[float, str]]:
 
-        if rule.decimal_shift_factor is None:
+        factor = rule.decimal_shift_factor
+
+        if factor is None:
             return []
 
         return [
             (
-                value * rule.decimal_shift_factor,
+                value * factor,
                 self.name,
             )
         ]
@@ -74,12 +81,14 @@ class PercentTransform(BaseTransform):
         rule: NormalizationRule,
     ) -> list[tuple[float, str]]:
 
-        if rule.percent_factor is None:
+        factor = rule.percent_factor
+
+        if factor is None:
             return []
 
         return [
             (
-                value * rule.percent_factor,
+                value * factor,
                 self.name,
             )
         ]
@@ -106,14 +115,9 @@ class GkgToMgkgTransform(BaseTransform):
         ]
 
 
-TRANSFORMS = (
-
+TRANSFORMS: tuple[BaseTransform, ...] = (
     OverscaleTransform(),
-
     DecimalShiftTransform(),
-
     PercentTransform(),
-
     GkgToMgkgTransform(),
-
 )
