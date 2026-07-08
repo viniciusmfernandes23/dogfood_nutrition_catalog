@@ -92,6 +92,8 @@ NUTRIENT_ALIASES = {
         "em",
         "valor energético",
         "valor energetico",
+        "energia metabolizável (mín)",
+        "energia metabolizavel (min)",
     ],
 
 }

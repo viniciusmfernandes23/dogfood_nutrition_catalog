@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import re
 
-NUMBER = r"(\d+(?:[.,]\d+)?)"
+# Suporta 1.000,00 ou 1000,00 ou 1000.00
+NUMBER = r"(\d+(?:[.]\d{3})*(?:[,]\d+)?|\d+(?:[,]\d{3})*(?:[.]\d+)?|\d+)"
 
-UNIT = r"(mg/kg|g/kg|ppm|ui/kg|ui|%|kcal/kg|kcal/g|kcal)"
+UNIT = r"(mg/kg|g/kg|ppm|ui/kg|ui|%|kcal/kg|kcal/g|kcal|cal/kg|cal/g)"
 
-SEPARATOR = r"[^0-9]{0,40}"
+SEPARATOR = r"[^0-9]{0,100}"
 
 FLAGS = re.IGNORECASE | re.MULTILINE

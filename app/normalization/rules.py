@@ -35,7 +35,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         field="protein_gkg",
         target_min=60,
         target_max=600,
-        overscale_factor=1, # Removido fator 10x pois o valor já deve estar em g/kg
+        overscale_factor=10, # Reativado para lidar com resíduos de 10x
         percent_factor=PERCENT_TO_GKG_FACTOR,
     ),
 
@@ -43,7 +43,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         field="fat_gkg",
         target_min=20,
         target_max=400,
-        overscale_factor=1, # Removido fator 10x
+        overscale_factor=10,
         percent_factor=PERCENT_TO_GKG_FACTOR,
     ),
 
@@ -51,7 +51,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         field="fiber_gkg",
         target_min=5,
         target_max=250,
-        overscale_factor=1,
+        overscale_factor=10,
         percent_factor=PERCENT_TO_GKG_FACTOR,
     ),
 

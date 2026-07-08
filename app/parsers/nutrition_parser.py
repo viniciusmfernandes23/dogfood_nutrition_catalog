@@ -43,7 +43,19 @@ def parse_value(
             continue
 
         try:
-            value = float(match.group(1).replace(",", "."))
+            raw_val = match.group(1)
+            # Se tem ponto e vírgula, o ponto é milhar (ex: 1.500,00)
+            if "." in raw_val and "," in raw_val:
+                clean_val = raw_val.replace(".", "").replace(",", ".")
+            # Se tem apenas vírgula e ela parece ser decimal (ex: 3500,00 ou 26,0)
+            elif "," in raw_val:
+                # Se tem apenas uma vírgula e 1 ou 2 dígitos depois, é decimal
+                # Caso contrário, pode ser milhar (ex: 1,500) - mas no Brasil vírgula é decimal
+                clean_val = raw_val.replace(",", ".")
+            else:
+                clean_val = raw_val
+                
+            value = float(clean_val)
             unit = match.group(2).strip().lower() if match.group(2) else None
             
             # Normalização básica de unidades comuns para facilitar o resolver
@@ -53,7 +65,7 @@ def parse_value(
                 unit = "g/kg"
             elif unit in ["mg/kg", "mg / kg", "mg.kg"]:
                 unit = "mg/kg"
-            elif unit in ["kcal/kg", "kcal / kg", "kcal.kg", "kcal"]:
+            elif unit in ["kcal/kg", "kcal / kg", "kcal.kg", "kcal", "cal/kg", "cal"]:
                 unit = "kcal/kg"
 
             return (
