@@ -53,16 +53,18 @@ class NormalizationEngine:
             base_name = field.split('_')[0]
             unit_col_base = f"{base_name}_unit"
             # 3. Busca por {base_name}_{suffix}_unit (ex: calcium_min_unit)
-            unit_col_minmax = None
+            unit_col_special = None
             if "_min_" in field:
-                unit_col_minmax = f"{base_name}_min_unit"
+                unit_col_special = f"{base_name}_min_unit"
             elif "_max_" in field:
-                unit_col_minmax = f"{base_name}_max_unit"
+                unit_col_special = f"{base_name}_max_unit"
+            elif "metabolizable_energy" in field:
+                unit_col_special = "metabolizable_energy_unit"
             
             if unit_col_full in row and pd.notna(row.get(unit_col_full)):
                 original_unit = row.get(unit_col_full)
-            elif unit_col_minmax and unit_col_minmax in row and pd.notna(row.get(unit_col_minmax)):
-                original_unit = row.get(unit_col_minmax)
+            elif unit_col_special and unit_col_special in row and pd.notna(row.get(unit_col_special)):
+                original_unit = row.get(unit_col_special)
             elif unit_col_base in row and pd.notna(row.get(unit_col_base)):
                 original_unit = row.get(unit_col_base)
 

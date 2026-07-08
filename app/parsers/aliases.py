@@ -86,4 +86,12 @@ NUTRIENT_ALIASES = {
 
     ],
 
+    "metabolizable_energy": [
+        "energia metabolizável",
+        "energia metabolizavel",
+        "em",
+        "valor energético",
+        "valor energetico",
+    ],
+
 }

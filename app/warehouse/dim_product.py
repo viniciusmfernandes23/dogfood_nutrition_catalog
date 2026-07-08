@@ -30,6 +30,7 @@ class ProductDimensionBuilder:
         "_gkg",
         "_mgkg",
         "_uikg",
+        "_kcalkg",
     )
 
     def __init__(self) -> None:

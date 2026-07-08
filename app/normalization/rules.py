@@ -121,6 +121,14 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         gkg_to_mgkg=True,
     ),
 
+    "metabolizable_energy_kcalkg": NormalizationRule(
+        field="metabolizable_energy_kcalkg",
+        target_min=2000,
+        target_max=6000,
+        overscale_factor=1,
+        decimal_shift_factor=1000, # Caso venha em kcal/g (ex: 3.5 -> 3500)
+    ),
+
 }
 
 
@@ -142,6 +150,10 @@ MINERALS = (
     "phosphorus_mgkg",
     "sodium_mgkg",
     "potassium_mgkg",
+)
+
+ENERGY = (
+    "metabolizable_energy_kcalkg",
 )
 
 NORMALIZABLE_FIELDS = tuple(NORMALIZATION_RULES.keys())

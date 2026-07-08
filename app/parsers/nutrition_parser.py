@@ -53,6 +53,8 @@ def parse_value(
                 unit = "g/kg"
             elif unit in ["mg/kg", "mg / kg", "mg.kg"]:
                 unit = "mg/kg"
+            elif unit in ["kcal/kg", "kcal / kg", "kcal.kg", "kcal"]:
+                unit = "kcal/kg"
 
             return (
                 value,

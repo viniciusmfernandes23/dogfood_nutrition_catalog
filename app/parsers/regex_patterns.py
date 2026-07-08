@@ -4,7 +4,7 @@ import re
 
 NUMBER = r"(\d+(?:[.,]\d+)?)"
 
-UNIT = r"(mg/kg|g/kg|ppm|ui/kg|ui|%)"
+UNIT = r"(mg/kg|g/kg|ppm|ui/kg|ui|%|kcal/kg|kcal/g|kcal)"
 
 SEPARATOR = r"[^0-9]{0,40}"
 

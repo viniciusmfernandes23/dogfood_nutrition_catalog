@@ -120,7 +120,8 @@ def run_extraction():
             'calcium_max': 'calcium_max_mgkg',
             'phosphorus': 'phosphorus_mgkg',
             'sodium': 'sodium_mgkg',
-            'potassium': 'potassium_mgkg'
+            'potassium': 'potassium_mgkg',
+            'metabolizable_energy': 'metabolizable_energy_kcalkg'
         }
         
         for index, row in full_df.iterrows():

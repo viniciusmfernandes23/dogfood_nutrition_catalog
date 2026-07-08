@@ -103,10 +103,17 @@ class Resolver:
         rule: NormalizationRule,
         original_unit: str | None = None,
     ) -> NormalizationResult:
+        
+        target_unit = "g/kg"
+        if rule.field.endswith("_mgkg"):
+            target_unit = "mg/kg"
+        elif rule.field.endswith("_kcalkg"):
+            target_unit = "kcal/kg"
+            
         nutrient = NormalizedNutrient(
             name=rule.field,
             value=value,
-            unit="mg/kg" if rule.field.endswith("_mgkg") else "g/kg",
+            unit=target_unit,
             original_unit=original_unit
         )
 
@@ -148,6 +155,10 @@ class Resolver:
             if target_is_mgkg:
                 return value, "already_mgkg"
             return value / GKG_TO_MGKG_FACTOR, "mgkg_to_gkg"
+            
+        if unit == "kcal/kg":
+            if rule.field.endswith("_kcalkg"):
+                return value, "already_kcalkg"
             
         return None, None
 
