@@ -67,58 +67,44 @@ class PipelineOrchestrator:
         try:
 
             # ----------------------------------------------
-            # Coleta
+            # Coleta e Métricas
+            # ----------------------------------------------
+            self.metrics.set_collected(len(dataframe))
+
+            # Se for atualização parcial, ignoramos parser, normalização e semântica
+            # e vamos direto para a atualização de preços no warehouse.
+            if not self.config.full_update:
+                print("Modo de Atualização Parcial: Atualizando apenas Preços e Disponibilidade...")
+                
+                # Tentamos carregar o dim_product existente para manter a integridade
+                # mas o warehouse_pipeline.run cuidará de construir apenas o necessário.
+                tables, exported = self.warehouse_pipeline.run(dataframe)
+                
+                result.exported_files = exported
+                self.metrics.set_exported(len(tables.get("fact_price_snapshot", pd.DataFrame())))
+                return result
+
+            # ----------------------------------------------
+            # Fluxo Completo (Parser + Normalização + Semântica)
             # ----------------------------------------------
 
-            self.metrics.set_collected(
-                len(dataframe),
-            )
-
-            # ----------------------------------------------
-            # Parser
-            # ----------------------------------------------
-
-            self.metrics.set_parsed(
-                len(dataframe),
-            )
-
-            # ----------------------------------------------
-            # Normalização
-            # ----------------------------------------------
+            self.metrics.set_parsed(len(dataframe))
 
             normalized_df, normalization_report = (
-                self.normalization_engine.normalize_dataframe(
-                    dataframe,
-                )
+                self.normalization_engine.normalize_dataframe(dataframe)
             )
 
-            self.metrics.set_normalized(
-                len(normalized_df),
-            )
+            self.metrics.set_normalized(len(normalized_df))
+            self.metrics.set_normalization_changes(normalization_report.auto_corrected_records)
 
-            self.metrics.set_normalization_changes(
-                normalization_report.auto_corrected_records,
-            )
-
-            # ----------------------------------------------
-            # Enriquecimento Semântico
-            # ----------------------------------------------
-
-            semantic_df = self.semantic_engine.enrich_dataframe(
-                normalized_df,
-            )
-
-            self.metrics.set_enriched(
-                len(semantic_df),
-            )
+            semantic_df = self.semantic_engine.enrich_dataframe(normalized_df)
+            self.metrics.set_enriched(len(semantic_df))
 
             # ----------------------------------------------
             # Warehouse
             # ----------------------------------------------
 
-            tables, exported = self.warehouse_pipeline.run(
-                semantic_df,
-            )
+            tables, exported = self.warehouse_pipeline.run(semantic_df)
 
             result.exported_files = exported
 
