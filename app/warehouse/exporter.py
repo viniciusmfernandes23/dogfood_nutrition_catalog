@@ -148,11 +148,12 @@ class WarehouseExporter:
                 # Carrega o arquivo existente
                 existing_df = pd.read_csv(output_file, encoding="utf-8-sig")
                 
-                # Converte datas para string para garantir comparação correta no drop_duplicates
-                if "collected_at" in existing_df.columns:
-                    existing_df["collected_at"] = existing_df["collected_at"].astype(str)
-                if "collected_at" in dataframe.columns:
-                    dataframe["collected_at"] = dataframe["collected_at"].astype(str)
+                # Garante tipos consistentes para detecção de duplicatas
+                for col in ["product_id", "collected_at", "nutrient_name"]:
+                    if col in existing_df.columns:
+                        existing_df[col] = existing_df[col].astype(str)
+                    if col in dataframe.columns:
+                        dataframe[col] = dataframe[col].astype(str)
 
                 # Concatenamos
                 combined_df = pd.concat([existing_df, dataframe], ignore_index=True)
