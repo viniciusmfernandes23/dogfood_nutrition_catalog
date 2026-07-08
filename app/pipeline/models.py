@@ -18,6 +18,10 @@ class PipelineConfig:
 
     warehouse_directory: str = "data/output/warehouse"
 
+    # Se True, atualiza todo o catálogo (API + Crawler). 
+    # Se False, atualiza apenas preços e disponibilidade (API apenas).
+    full_update: bool = True
+
     overwrite: bool = True
 
     export_csv: bool = True

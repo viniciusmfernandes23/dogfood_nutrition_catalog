@@ -143,28 +143,33 @@ class WarehouseExporter:
         )
 
         # Se for append e o arquivo já existir, carregamos o existente para evitar duplicatas
-        # (Heurística simples: se o product_id + collected_at já existir, não adicionamos)
         if append and output_file.exists():
             try:
+                # Carrega o arquivo existente
                 existing_df = pd.read_csv(output_file, encoding="utf-8-sig")
-                # Concatenamos e removemos duplicatas
+                
+                # Converte datas para string para garantir comparação correta no drop_duplicates
+                if "collected_at" in existing_df.columns:
+                    existing_df["collected_at"] = existing_df["collected_at"].astype(str)
+                if "collected_at" in dataframe.columns:
+                    dataframe["collected_at"] = dataframe["collected_at"].astype(str)
+
+                # Concatenamos
                 combined_df = pd.concat([existing_df, dataframe], ignore_index=True)
                 
-                # Remove duplicatas baseadas em colunas chave se existirem
-                subset = []
-                if "product_id" in combined_df.columns:
-                    subset.append("product_id")
+                # Identifica colunas para detecção de duplicatas
+                subset = ["product_id"]
                 if "collected_at" in combined_df.columns:
                     subset.append("collected_at")
                 if "nutrient_name" in combined_df.columns:
                     subset.append("nutrient_name")
                 
-                if subset:
-                    combined_df = combined_df.drop_duplicates(subset=subset, keep='last')
+                # Remove duplicatas (mantém a versão mais recente se houver conflito no mesmo timestamp)
+                combined_df = combined_df.drop_duplicates(subset=subset, keep='last')
                 
                 dataframe = combined_df
-            except Exception:
-                pass # Se falhar ao ler, sobrescrevemos por segurança
+            except Exception as e:
+                print(f"Erro ao carregar histórico ({filename}): {e}. Sobrescrevendo...")
 
         dataframe.to_csv(
             output_file,
@@ -199,9 +204,12 @@ class WarehouseExporter:
     def clean_output_directory(
         self,
     ) -> None:
-
+        """
+        Limpa o diretório de saída, mas preserva arquivos fato que devem ser acumulativos.
+        """
+        preserved_files = ["fact_price_snapshot.csv", "fact_nutrient.csv"]
         for file in self.output_dir.iterdir():
-            if file.is_file():
+            if file.is_file() and file.name not in preserved_files:
                 file.unlink()
 
     def file_exists(

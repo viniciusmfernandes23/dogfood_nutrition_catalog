@@ -35,7 +35,14 @@ def fix_nutrient_scale(value):
     return float(value) / 10.0
 
 def run_extraction():
-    print("Iniciando coleta de dados...")
+    import argparse
+    parser = argparse.ArgumentParser(description="Pipeline de Nutrição Canina")
+    parser.add_argument("--mode", type=str, choices=["full", "price"], default="full", 
+                        help="Modo: 'full' (atualiza tudo + crawler) ou 'price' (apenas preços)")
+    args, _ = parser.parse_known_args()
+    
+    is_full = args.mode == "full"
+    print(f"Iniciando coleta de dados (Modo: {args.mode})...")
     
     # Pasta dedicada para os arquivos de saída
     OUTPUT_DIR = "output"
@@ -93,54 +100,58 @@ def run_extraction():
             
         df = pd.DataFrame(product_list)
         
-        # 2. Coleta de Níveis de Garantia (Crawler)
+        # 2. Coleta de Níveis de Garantia (Crawler) - Apenas no modo FULL
         full_df = df.copy()
-        if 'raw_guarantee' not in full_df.columns:
-            print(f"Extraindo níveis de garantia...")
-            crawler = CobasiCrawler()
-            guarantees = []
-            for i, url in enumerate(full_df['url']):
-                if i % 10 == 0: print(f"  Progresso: {i}/{len(full_df)}")
-                try:
-                    res = crawler.collect(url)
-                    guarantees.append(res.guarantee_section if res.success else None)
-                except Exception:
-                    guarantees.append(None)
-            full_df['raw_guarantee'] = guarantees
         
-        # 3. Parsing e Mapeamento de Nutrientes
-        print("Fazendo parsing e mapeando nutrientes...")
-        mapping = {
-            'protein': 'protein_gkg',
-            'fat': 'fat_gkg',
-            'fiber': 'fiber_gkg',
-            'ash': 'ash_gkg',
-            'moisture': 'moisture_gkg',
-            'calcium_min': 'calcium_min_mgkg',
-            'calcium_max': 'calcium_max_mgkg',
-            'phosphorus': 'phosphorus_mgkg',
-            'sodium': 'sodium_mgkg',
-            'potassium': 'potassium_mgkg',
-            'metabolizable_energy': 'metabolizable_energy_kcalkg'
-        }
-        
-        for index, row in full_df.iterrows():
-            nutrients = parse_nutrition(row['raw_guarantee'])
-            for nut_key, nut_data in nutrients.items():
-                target_col = mapping.get(nut_key)
-                if target_col:
-                    # Correção de Escala: O parser retorna valores multiplicados por 10 (ex: 26.0 vira 260).
-                    # Para que o orchestrator normalize corretamente, passamos o valor real (dividido por 10).
-                    val_real = fix_nutrient_scale(nut_data['value'])
-                    
-                    full_df.at[index, target_col] = val_real
-                    full_df.at[index, f"{nut_key}_unit"] = nut_data['unit']
-        
+        if is_full:
+            if 'raw_guarantee' not in full_df.columns:
+                print(f"Extraindo níveis de garantia...")
+                crawler = CobasiCrawler()
+                guarantees = []
+                for i, url in enumerate(full_df['url']):
+                    if i % 10 == 0: print(f"  Progresso: {i}/{len(full_df)}")
+                    try:
+                        res = crawler.collect(url)
+                        guarantees.append(res.guarantee_section if res.success else None)
+                    except Exception:
+                        guarantees.append(None)
+                full_df['raw_guarantee'] = guarantees
+
+            # 3. Preparar colunas de nutrientes para o orquestrador
+            nutrient_mapping = {
+                'protein': 'protein_gkg',
+                'fat': 'fat_gkg',
+                'fiber': 'fiber_gkg',
+                'ash': 'ash_gkg',
+                'moisture': 'moisture_gkg',
+                'calcium_min': 'calcium_min_mgkg',
+                'calcium_max': 'calcium_max_mgkg',
+                'phosphorus': 'phosphorus_mgkg',
+                'sodium': 'sodium_mgkg',
+                'potassium': 'potassium_mgkg',
+                'metabolizable_energy': 'metabolizable_energy_kcalkg'
+            }
+            
+            for index, row in full_df.iterrows():
+                nutrients = parse_nutrition(row['raw_guarantee'])
+                for nut_key, nut_data in nutrients.items():
+                    target_col = nutrient_mapping.get(nut_key)
+                    if target_col:
+                        val_real = fix_nutrient_scale(nut_data['value'])
+                        full_df.at[index, target_col] = val_real
+                        full_df.at[index, f"{nut_key}_unit"] = nut_data['unit']
+        else:
+            print("Pulando extração nutricional (Modo PRICE).")
+            if 'raw_guarantee' not in full_df.columns:
+                full_df['raw_guarantee'] = None
+
         # 4. Executar o Orquestrador
         print("Executando orquestrador do pipeline...")
         config = PipelineConfig(
             output_directory=os.path.join(OUTPUT_DIR, "reports"),
-            warehouse_directory=os.path.join(OUTPUT_DIR, "warehouse")
+            warehouse_directory=os.path.join(OUTPUT_DIR, "warehouse"),
+            full_update=is_full,
+            overwrite=True # O orchestrator agora preserva arquivos acumulativos internamente
         )
         orchestrator = PipelineOrchestrator(config)
         result = orchestrator.run(full_df)
