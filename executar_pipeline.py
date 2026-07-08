@@ -24,15 +24,7 @@ def format_currency(value):
     # Ex: 1500.50 -> "1500,50"
     return f"{value:.2f}".replace(".", ",")
 
-def fix_nutrient_scale(value):
-    """
-    Corrige a escala de 10x aplicada aos nutrientes para preservar decimais em inteiros.
-    Como o projeto optou por armazenar valores multiplicados por 10 (ex: 26.0% vira 260 g/kg),
-    esta função divide por 10 para retornar ao valor real.
-    """
-    if value is None or pd.isna(value):
-        return None
-    return float(value) / 10.0
+# fix_nutrient_scale removido pois o parser atual já retorna o valor real
 
 def run_extraction():
     import argparse
@@ -137,7 +129,7 @@ def run_extraction():
                 for nut_key, nut_data in nutrients.items():
                     target_col = nutrient_mapping.get(nut_key)
                     if target_col:
-                        val_real = fix_nutrient_scale(nut_data['value'])
+                        val_real = nut_data['value']
                         full_df.at[index, target_col] = val_real
                         full_df.at[index, f"{nut_key}_unit"] = nut_data['unit']
         else:

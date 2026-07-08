@@ -116,9 +116,10 @@ class WarehousePipeline:
 
     def clean(
         self,
+        full_clean: bool = False,
     ) -> None:
 
-        self.exporter.clean_output_directory()
+        self.exporter.clean_output_directory(full_clean=full_clean)
 
     def list_exports(
         self,

@@ -54,7 +54,9 @@ class PipelineOrchestrator:
 
         # Se configurado para sobrescrever, limpamos o diretório antes da execução
         if self.config.overwrite:
-            self.clean_output()
+            # Se for atualização completa, limpamos também o histórico de nutrientes (mas mantemos preços)
+            # A lógica exata de preservação está no exporter.py
+            self.clean_output(full_clean=False)
 
         result = PipelineResult(
 
@@ -149,6 +151,7 @@ class PipelineOrchestrator:
 
     def clean_output(
         self,
+        full_clean: bool = False,
     ) -> None:
 
-        self.warehouse_pipeline.clean()
+        self.warehouse_pipeline.clean(full_clean=full_clean)

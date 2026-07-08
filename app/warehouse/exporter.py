@@ -48,11 +48,13 @@ class WarehouseExporter:
         dataframe: pd.DataFrame,
         filename: str,
     ) -> Path:
-        """Tabelas fato são incrementais para manter o histórico."""
+        """Tabelas fato de preços são incrementais. Outras (nutrientes) são sobrescritas."""
+        # Apenas fact_price_snapshot mantém histórico
+        is_incremental = (filename == "fact_price_snapshot.csv")
         return self._export_csv(
             dataframe,
             filename,
-            append=True
+            append=is_incremental
         )
 
     def export_all(
@@ -165,8 +167,17 @@ class WarehouseExporter:
                 if "nutrient_name" in combined_df.columns:
                     subset.append("nutrient_name")
                 
-                # Remove duplicatas (mantém a versão mais recente se houver conflito no mesmo timestamp)
-                combined_df = combined_df.drop_duplicates(subset=subset, keep='last')
+                # Ajuste: No caso de fact_price_snapshot, a deduplicação deve usar apenas a data (sem hora)
+                # pois o pipeline atualiza os preços diariamente
+                if filename == "fact_price_snapshot.csv" and "collected_at" in combined_df.columns:
+                    # Cria coluna temporária apenas com a data para deduplicação
+                    combined_df["_date_only"] = pd.to_datetime(combined_df["collected_at"]).dt.date
+                    subset = ["product_id", "_date_only"]
+                    combined_df = combined_df.drop_duplicates(subset=subset, keep='last')
+                    combined_df = combined_df.drop(columns=["_date_only"])
+                else:
+                    # Remove duplicatas (mantém a versão mais recente se houver conflito no mesmo timestamp)
+                    combined_df = combined_df.drop_duplicates(subset=subset, keep='last')
                 
                 dataframe = combined_df
             except Exception as e:
@@ -204,11 +215,14 @@ class WarehouseExporter:
 
     def clean_output_directory(
         self,
+        full_clean: bool = False,
     ) -> None:
         """
-        Limpa o diretório de saída, mas preserva arquivos fato que devem ser acumulativos.
+        Limpa o diretório de saída.
+        Se full_clean=True, remove tudo. Caso contrário, preserva histórico de preços.
+        Nota: fact_nutrient.csv nunca é preservado para evitar acúmulo de valores de escala errados.
         """
-        preserved_files = ["fact_price_snapshot.csv", "fact_nutrient.csv"]
+        preserved_files = [] if full_clean else ["fact_price_snapshot.csv"]
         for file in self.output_dir.iterdir():
             if file.is_file() and file.name not in preserved_files:
                 file.unlink()
