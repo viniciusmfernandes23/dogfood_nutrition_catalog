@@ -136,6 +136,15 @@ class WarehouseExporter:
         filename: str,
         append: bool = False
     ) -> Path:
+        # Trava de Sanidade Final: Antes de exportar, limpamos valores impossíveis
+        if "nutrient_value" in dataframe.columns:
+            # Anula valores astronômicos (> 100.000) ou negativos
+            # (Nenhum nutriente real ultrapassa 100.000 mg/kg ou kcal/kg)
+            mask_invalid = (dataframe["nutrient_value"] > 100000) | (dataframe["nutrient_value"] < 0)
+            if mask_invalid.any():
+                count = mask_invalid.sum()
+                print(f"[SANITY CHECK] Anulando {count} valores impossíveis em {filename}")
+                dataframe.loc[mask_invalid, "nutrient_value"] = None
 
         output_file = (
             self.output_dir
