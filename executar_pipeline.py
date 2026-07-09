@@ -61,7 +61,7 @@ def run_extraction():
     else:
         print(f"Usando pasta de saída em: {ABS_OUTPUT_DIR}")
     
-    print(f"--- Pipeline Dogfood Nutrition Catalog v1.2.1 ---")
+    print(f"--- Pipeline Dogfood Nutrition Catalog v1.2.2 ---")
     print(f"Data/Hora local: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
 
     try:
