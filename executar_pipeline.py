@@ -36,13 +36,25 @@ def run_extraction():
     is_full = args.mode == "full"
     print(f"Iniciando coleta de dados (Modo: {args.mode})...")
     
+    # Limpeza de Cache de Módulos Python (Bomba de Limpeza)
+    for root, dirs, files in os.walk("."):
+        for d in dirs:
+            if d == "__pycache__":
+                shutil.rmtree(os.path.join(root, d))
+        for f in files:
+            if f.endswith(".pyc"):
+                os.remove(os.path.join(root, f))
+
     # Pasta dedicada para os arquivos de saída
     OUTPUT_DIR = "output"
+    ABS_OUTPUT_DIR = os.path.abspath(OUTPUT_DIR)
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
-        print(f"Pasta '{OUTPUT_DIR}' criada.")
+        print(f"Pasta '{OUTPUT_DIR}' criada em: {ABS_OUTPUT_DIR}")
+    else:
+        print(f"Usando pasta de saída em: {ABS_OUTPUT_DIR}")
     
-    print(f"--- Pipeline Dogfood Nutrition Catalog v1.2.0 ---")
+    print(f"--- Pipeline Dogfood Nutrition Catalog v1.2.1 ---")
     print(f"Data/Hora local: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
 
     try:

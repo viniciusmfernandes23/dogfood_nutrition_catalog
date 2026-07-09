@@ -29,6 +29,9 @@ class Resolver:
         nutrient: NormalizedNutrient,
         rule: NormalizationRule | None = None,
     ) -> NormalizedNutrient:
+        # Log de Auditoria para depuração do usuário
+        if nutrient.name == "sodium_mgkg" and nutrient.value is not None and (nutrient.value > 100000 or nutrient.value < 1):
+             print(f"[AUDIT] Resolvendo {nutrient.name}: valor_entrada={nutrient.value}, unidade={nutrient.original_unit}")
 
         if nutrient.value is None:
             nutrient.status = ValidationStatus.MISSING
@@ -47,6 +50,7 @@ class Resolver:
                     nutrient.status = ValidationStatus.AUTO_CORRECTED
                     nutrient.rule_applied = "fix_accumulated_scale_percent"
                     nutrient.confidence = 1.0
+                    print(f"[AUDIT] Valor corrigido recursivamente (percent): {nutrient.value}")
                     return nutrient
                 # Tenta também divisão por 10 (overscale acumulado)
                 temp_value_10 = nutrient.value / 10.0
