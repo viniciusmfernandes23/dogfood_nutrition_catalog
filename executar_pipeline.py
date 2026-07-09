@@ -37,13 +37,20 @@ def run_extraction():
     print(f"Iniciando coleta de dados (Modo: {args.mode})...")
     
     # Limpeza de Cache de Módulos Python (Bomba de Limpeza)
+    # No Windows/OneDrive, pastas de cache podem estar travadas. Usamos ignore_errors=True.
     for root, dirs, files in os.walk("."):
         for d in dirs:
             if d == "__pycache__":
-                shutil.rmtree(os.path.join(root, d))
+                try:
+                    shutil.rmtree(os.path.join(root, d), ignore_errors=True)
+                except Exception:
+                    pass
         for f in files:
             if f.endswith(".pyc"):
-                os.remove(os.path.join(root, f))
+                try:
+                    os.remove(os.path.join(root, f))
+                except Exception:
+                    pass
 
     # Pasta dedicada para os arquivos de saída
     OUTPUT_DIR = "output"
