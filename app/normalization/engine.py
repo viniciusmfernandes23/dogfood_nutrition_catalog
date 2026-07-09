@@ -109,7 +109,8 @@ class NormalizationEngine:
 
     def _audit_biological_coherence(self, df: pd.DataFrame, index: int, product_id: Any) -> None:
         """
-        Realiza validações cruzadas para garantir a integridade biológica do produto.
+        Realiza validações cruzadas rigorosas para garantir a integridade biológica do produto.
+        v1.3.1: Foco em anulação de dados impossíveis e âncora de umidade.
         """
         # 1. Inversão Mínimo vs Máximo (Cálcio)
         ca_min = df.at[index, "calcium_min_mgkg"]
@@ -118,37 +119,51 @@ class NormalizationEngine:
             print(f"[BIOLOGICAL AUDIT] Inversão Ca Min/Max detectada no produto {product_id}. Trocando valores.")
             df.at[index, "calcium_min_mgkg"], df.at[index, "calcium_max_mgkg"] = ca_max, ca_min
 
-        # 2. Soma de Macronutrientes (Proteína + Gordura + Fibra + Cinzas <= 1000 g/kg)
-        macros = ["protein_gkg", "fat_gkg", "fiber_gkg", "ash_gkg"]
-        macro_sum = sum(df.at[index, m] for m in macros if pd.notna(df.at[index, m]))
-        if macro_sum > 1000:
-            print(f"[BIOLOGICAL AUDIT] Soma de macros ({macro_sum}g/kg) impossível no produto {product_id}. Anulando valores suspeitos.")
-            for m in macros:
-                if pd.notna(df.at[index, m]) and df.at[index, m] > 600: # Valor individual bizarro
-                    df.at[index, m] = None
+        # 2. Soma de Macronutrientes (Proteína + Gordura + Fibra + Cinzas + Umidade <= 1000 g/kg)
+        macros_all = ["protein_gkg", "fat_gkg", "fiber_gkg", "ash_gkg", "moisture_gkg"]
+        macro_sum = sum(df.at[index, m] for m in macros_all if pd.notna(df.at[index, m]))
+        if macro_sum > 1050: # Tolerância de 5% para erros de arredondamento em rótulos
+            print(f"[BIOLOGICAL AUDIT] Soma total de nutrientes ({macro_sum}g/kg) impossível no produto {product_id}. Anulando linha nutricional.")
+            for m in macros_all:
+                df.at[index, m] = None
+            df.at[index, "metabolizable_energy_kcalkg"] = None
+            return # Interrompe auditoria para esta linha já invalidada
 
-        # 3. Razão Cálcio : Fósforo (Ideal 1:1 a 2:1)
-        # Se Ca:P < 0.5 ou Ca:P > 3.0, há algo muito errado (exceto dietas específicas)
+        # 3. Âncora de Umidade vs Energia (Rações Úmidas)
+        moisture = df.at[index, "moisture_gkg"]
+        energy = df.at[index, "metabolizable_energy_kcalkg"]
+        if pd.notna(moisture) and pd.notna(energy):
+            # Regra de Ouro: Umidade > 70% -> Energia Máxima 1.500 kcal/kg
+            if moisture > 700 and energy > 1500:
+                print(f"[BIOLOGICAL AUDIT] Energia Impossível para Ração Úmida ({energy} kcal/kg com {moisture}g/kg umidade) no produto {product_id}.")
+                # Se for > 6000 (limite físico absoluto), anulamos. Se for intermediário, tentamos dividir por 10.
+                if energy > 6000:
+                    df.at[index, "metabolizable_energy_kcalkg"] = None
+                else:
+                    df.at[index, "metabolizable_energy_kcalkg"] = round(energy / 10.0, 2)
+
+        # 4. Limite Físico Absoluto de Energia (Gordura pura = 9000 kcal/kg)
+        if pd.notna(energy) and energy > 9000:
+            print(f"[BIOLOGICAL AUDIT] Energia excede limite físico da matéria orgânica ({energy} kcal/kg) no produto {product_id}. Anulando.")
+            df.at[index, "metabolizable_energy_kcalkg"] = None
+
+        # 5. Razão Cálcio : Fósforo (Auditoria de Toxicidade/Deficiência)
         p = df.at[index, "phosphorus_mgkg"]
         ca = df.at[index, "calcium_min_mgkg"] or df.at[index, "calcium_max_mgkg"]
         if pd.notna(ca) and pd.notna(p) and p > 0:
             ratio = ca / p
-            if ratio < 0.5 or ratio > 4.0:
-                print(f"[BIOLOGICAL AUDIT] Razão Ca:P bizarra ({ratio:.2f}) no produto {product_id}. Sinalizando para revisão.")
-                # Não anulamos automaticamente aqui para evitar perda de dados legítimos, 
-                # mas poderíamos anular se ratio > 10 por exemplo.
+            if ratio < 0.4 or ratio > 5.0:
+                print(f"[BIOLOGICAL AUDIT] Razão Ca:P bizarra ({ratio:.2f}) no produto {product_id}. Anulando minerais suspeitos.")
+                df.at[index, "calcium_min_mgkg"] = None
+                df.at[index, "calcium_max_mgkg"] = None
+                df.at[index, "phosphorus_mgkg"] = None
 
-        # 4. Coerência Energia vs Umidade
-        # Umidade > 70% (700g/kg) -> Energia raramente > 2000 kcal/kg (exceto se for gordura pura)
-        moisture = df.at[index, "moisture_gkg"]
-        energy = df.at[index, "metabolizable_energy_kcalkg"]
-        if pd.notna(moisture) and pd.notna(energy):
-            if moisture > 700 and energy > 2500:
-                print(f"[BIOLOGICAL AUDIT] Inconsistência Energia/Umidade no produto {product_id} ({moisture}g/kg umidade e {energy}kcal/kg).")
-                # Se umidade é 85% e energia é 4000, provavelmente a energia é 400 (por porção) ou 4000 (base seca).
-                # Como o padrão do catálogo é base úmida, dividimos por 10 se for > 2500 em ração úmida.
-                if energy > 2500:
-                    df.at[index, "metabolizable_energy_kcalkg"] = round(energy / 10.0, 2)
+        # 6. Trava de Toxicidade para Minerais (Sódio/Potássio)
+        for mineral in ["sodium_mgkg", "potassium_mgkg"]:
+            val = df.at[index, mineral]
+            if pd.notna(val) and val > 60000: # 6% de mineral é letal/impossível
+                print(f"[BIOLOGICAL AUDIT] Nível tóxico/impossível de {mineral} ({val} mg/kg) no produto {product_id}. Anulando.")
+                df.at[index, mineral] = None
 
     def normalize_dataframe(
         self,

@@ -198,31 +198,28 @@ class Resolver:
         value: float,
         rule: NormalizationRule,
     ) -> list[tuple[float, str]]:
+        """
+        Gera candidatos baseados apenas em fatores de escala e conversão seguros.
+        Removidas heurísticas de multiplicação agressivas para evitar instabilidade biológica.
+        """
         candidates: list[tuple[float, str]] = []
 
+        # 1. Overscale (Divisão por 10) - Comum em rótulos que preservam decimais
         if rule.overscale_factor:
             candidates.append((value / rule.overscale_factor, "overscale"))
 
-        if rule.decimal_shift_factor:
-            candidates.append((value * rule.decimal_shift_factor, "decimal_shift"))
-
+        # 2. Conversão de Porcentagem (Multiplicação por 10 ou 10.000)
         if rule.percent_factor:
             candidates.append((value * rule.percent_factor, "percent_conversion"))
 
+        # 3. Conversão g/kg para mg/kg (Multiplicação por 1000)
         if rule.gkg_to_mgkg:
             candidates.append((value * GKG_TO_MGKG_FACTOR, "gkg_to_mgkg"))
 
-        # 5. Deslocamento Decimal para baixo (Heurística para escala 10x/100x em macros/minerais)
-        # Se o valor estiver acima do máximo, tentamos divisões por 10 e 100
+        # 4. Deslocamento Decimal descendente (Heurística de segurança para valores altos)
         if value > rule.target_max:
-            candidates.append((value / 10.0, "decimal_shift_down_10"))
-            candidates.append((value / 100.0, "decimal_shift_down_100"))
-
-        # 6. Heurística para valores extremamente baixos (ex: Energia 29-100 kcal/kg)
-        if value < rule.target_min:
-            candidates.append((value * 10.0, "decimal_shift_up_10"))
-            candidates.append((value * 100.0, "decimal_shift_up_100"))
-            candidates.append((value * 1000.0, "decimal_shift_up_1000"))
+            candidates.append((value / 10.0, "fix_10x_scale"))
+            candidates.append((value / 100.0, "fix_100x_scale"))
 
         return candidates
 
