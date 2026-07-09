@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -59,15 +59,11 @@ class PipelineMetrics:
 
     def start(self) -> None:
 
-        self.started_at = datetime.now(
-            UTC,
-        )
+        self.started_at = datetime.now()
 
     def finish(self) -> None:
 
-        self.finished_at = datetime.now(
-            UTC,
-        )
+        self.finished_at = datetime.now()
 
         if self.started_at is not None:
 

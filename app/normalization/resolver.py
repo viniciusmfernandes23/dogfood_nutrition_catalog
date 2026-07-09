@@ -39,30 +39,25 @@ class Resolver:
             return nutrient
 
         # Proteção e Auto-Correção de valores astronômicos
-        # Se o valor for > 100.000, provavelmente sofreu múltiplas multiplicações por 10.000 (%)
+        # Se o valor for > 100.000, provavelmente sofreu múltiplas multiplicações indevidas
         if nutrient.value > 100_000:
             temp_value = nutrient.value
-            for _ in range(5): # Tenta até 5 divisões sucessivas
-                temp_value /= 10000.0
-                if self.validator.is_valid(temp_value, rule):
-                    nutrient.original_value = nutrient.value
-                    nutrient.value = temp_value
-                    nutrient.status = ValidationStatus.AUTO_CORRECTED
-                    nutrient.rule_applied = "fix_accumulated_scale_percent"
-                    nutrient.confidence = 1.0
-                    print(f"[AUDIT] Valor corrigido recursivamente (percent): {nutrient.value}")
-                    return nutrient
-                # Tenta também divisão por 10 (overscale acumulado)
-                temp_value_10 = nutrient.value / 10.0
-                if self.validator.is_valid(temp_value_10, rule):
-                    nutrient.original_value = nutrient.value
-                    nutrient.value = temp_value_10
-                    nutrient.status = ValidationStatus.AUTO_CORRECTED
-                    nutrient.rule_applied = "fix_accumulated_scale_10x"
-                    nutrient.confidence = 1.0
-                    return nutrient
+            # Tenta divisões sucessivas por 10.000 (%), 1.000 (g/kg) e 10 (overscale)
+            for factor in [10000.0, 1000.0, 10.0]:
+                test_val = nutrient.value
+                for _ in range(4): # Tenta até 4 níveis de escala acumulada
+                    test_val /= factor
+                    if self.validator.is_valid(test_val, rule):
+                        nutrient.original_value = nutrient.value
+                        nutrient.value = test_val
+                        nutrient.status = ValidationStatus.AUTO_CORRECTED
+                        nutrient.rule_applied = f"fix_accumulated_scale_{int(factor)}"
+                        nutrient.confidence = 1.0
+                        print(f"[AUDIT] Valor corrigido recursivamente ({factor}): {nutrient.value}")
+                        return nutrient
             
             # Se não conseguiu corrigir, anula o valor para não poluir o dataset
+            print(f"[AUDIT] VALOR ANULADO (IMPOSSÍVEL CORRIGIR): {nutrient.value}")
             nutrient.original_value = nutrient.value
             nutrient.value = None
             nutrient.status = ValidationStatus.IMPLAUSIBLE
