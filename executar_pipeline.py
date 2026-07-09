@@ -41,6 +41,9 @@ def run_extraction():
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
         print(f"Pasta '{OUTPUT_DIR}' criada.")
+    
+    print(f"--- Pipeline Dogfood Nutrition Catalog v1.2.0 ---")
+    print(f"Data/Hora local: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
 
     try:
         # 1. Coleta de dados da API
@@ -139,6 +142,15 @@ def run_extraction():
 
         # 4. Executar o Orquestrador
         print("Executando orquestrador do pipeline...")
+        
+        # Forçar limpeza absoluta de nutrientes se for modo full
+        if is_full:
+            warehouse_path = os.path.join(OUTPUT_DIR, "warehouse")
+            nut_file = os.path.join(warehouse_path, "fact_nutrient.csv")
+            if os.path.exists(nut_file):
+                print(f"Limpando cache de nutrientes antigo: {nut_file}")
+                os.remove(nut_file)
+
         config = PipelineConfig(
             output_directory=os.path.join(OUTPUT_DIR, "reports"),
             warehouse_directory=os.path.join(OUTPUT_DIR, "warehouse"),

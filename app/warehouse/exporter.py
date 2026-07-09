@@ -165,17 +165,26 @@ class WarehouseExporter:
                 if "nutrient_name" in combined_df.columns:
                     subset.append("nutrient_name")
                 
+                # Garantir que collected_at seja datetime para ordenação correta
+                if "collected_at" in combined_df.columns:
+                    combined_df["collected_at_dt"] = pd.to_datetime(combined_df["collected_at"])
+                    # Ordena por data para que 'last' seja realmente o mais recente
+                    combined_df = combined_df.sort_values(by="collected_at_dt")
+                
                 # Ajuste: No caso de fact_price_snapshot, a deduplicação deve usar apenas a data (sem hora)
                 # pois o pipeline atualiza os preços diariamente
                 if filename == "fact_price_snapshot.csv" and "collected_at" in combined_df.columns:
                     # Cria coluna temporária apenas com a data para deduplicação
-                    combined_df["_date_only"] = pd.to_datetime(combined_df["collected_at"]).dt.date
+                    combined_df["_date_only"] = combined_df["collected_at_dt"].dt.date
                     subset = ["product_id", "_date_only"]
                     combined_df = combined_df.drop_duplicates(subset=subset, keep='last')
                     combined_df = combined_df.drop(columns=["_date_only"])
                 else:
                     # Remove duplicatas (mantém a versão mais recente se houver conflito no mesmo timestamp)
                     combined_df = combined_df.drop_duplicates(subset=subset, keep='last')
+                
+                if "collected_at_dt" in combined_df.columns:
+                    combined_df = combined_df.drop(columns=["collected_at_dt"])
                 
                 dataframe = combined_df
             except Exception as e:
