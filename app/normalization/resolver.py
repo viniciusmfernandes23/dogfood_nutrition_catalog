@@ -35,12 +35,34 @@ class Resolver:
             nutrient.confidence = 0.0
             return nutrient
 
-        # Proteção contra valores astronômicos (artefatos de bugs anteriores ou erros de leitura)
-        # Valores acima de 100.000 são biologicamente impossíveis para qualquer nutriente no catálogo.
-        # (O máximo real é ~50.000 mg/kg para Cálcio/Fósforo e ~5.000 kcal/kg para Energia)
+        # Proteção e Auto-Correção de valores astronômicos
+        # Se o valor for > 100.000, provavelmente sofreu múltiplas multiplicações por 10.000 (%)
         if nutrient.value > 100_000:
+            temp_value = nutrient.value
+            for _ in range(5): # Tenta até 5 divisões sucessivas
+                temp_value /= 10000.0
+                if self.validator.is_valid(temp_value, rule):
+                    nutrient.original_value = nutrient.value
+                    nutrient.value = temp_value
+                    nutrient.status = ValidationStatus.AUTO_CORRECTED
+                    nutrient.rule_applied = "fix_accumulated_scale_percent"
+                    nutrient.confidence = 1.0
+                    return nutrient
+                # Tenta também divisão por 10 (overscale acumulado)
+                temp_value_10 = nutrient.value / 10.0
+                if self.validator.is_valid(temp_value_10, rule):
+                    nutrient.original_value = nutrient.value
+                    nutrient.value = temp_value_10
+                    nutrient.status = ValidationStatus.AUTO_CORRECTED
+                    nutrient.rule_applied = "fix_accumulated_scale_10x"
+                    nutrient.confidence = 1.0
+                    return nutrient
+            
+            # Se não conseguiu corrigir, anula o valor para não poluir o dataset
+            nutrient.original_value = nutrient.value
+            nutrient.value = None
             nutrient.status = ValidationStatus.IMPLAUSIBLE
-            nutrient.rule_applied = "implausible_extreme_value"
+            nutrient.rule_applied = "nullified_extreme_value"
             nutrient.confidence = 0.0
             return nutrient
 
