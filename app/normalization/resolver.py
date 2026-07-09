@@ -36,8 +36,9 @@ class Resolver:
             return nutrient
 
         # Proteção contra valores astronômicos (artefatos de bugs anteriores ou erros de leitura)
-        # Valores acima de 1.000.000 são biologicamente impossíveis para qualquer nutriente no catálogo.
-        if nutrient.value > 1_000_000:
+        # Valores acima de 100.000 são biologicamente impossíveis para qualquer nutriente no catálogo.
+        # (O máximo real é ~50.000 mg/kg para Cálcio/Fósforo e ~5.000 kcal/kg para Energia)
+        if nutrient.value > 100_000:
             nutrient.status = ValidationStatus.IMPLAUSIBLE
             nutrient.rule_applied = "implausible_extreme_value"
             nutrient.confidence = 0.0

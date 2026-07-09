@@ -68,8 +68,16 @@ class NormalizationEngine:
             elif unit_col_base in row and pd.notna(row.get(unit_col_base)):
                 original_unit = row.get(unit_col_base)
 
+            current_value = row.get(field)
+            
+            # Trava de Segurança: Se o valor já estiver no range plausível, 
+            # ignoramos a unidade original para evitar re-multiplicação indevida
+            # (Ex: se o valor é 1700 e a unidade é %, não multiplicamos por 10000 de novo)
+            if pd.notna(current_value) and rule.target_min <= current_value <= rule.target_max:
+                original_unit = None
+
             result = self.resolver.resolve_value(
-                value=row.get(field),
+                value=current_value,
                 rule=rule,
                 original_unit=original_unit
             )
