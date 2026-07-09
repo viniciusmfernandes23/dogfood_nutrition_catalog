@@ -49,9 +49,15 @@ def parse_value(
                 clean_val = raw_val.replace(".", "").replace(",", ".")
             # Se tem apenas vírgula e ela parece ser decimal (ex: 3500,00 ou 26,0)
             elif "," in raw_val:
-                # Se tem apenas uma vírgula e 1 ou 2 dígitos depois, é decimal
-                # Caso contrário, pode ser milhar (ex: 1,500) - mas no Brasil vírgula é decimal
                 clean_val = raw_val.replace(",", ".")
+            # Se tem apenas ponto e ele parece ser milhar (ex: 1.700 ou 3.500)
+            # Em rótulos brasileiros, ponto sem vírgula seguido de 3 dígitos é milhar.
+            elif "." in raw_val:
+                parts = raw_val.split(".")
+                if len(parts) == 2 and len(parts[1]) == 3:
+                    clean_val = raw_val.replace(".", "")
+                else:
+                    clean_val = raw_val
             else:
                 clean_val = raw_val
                 

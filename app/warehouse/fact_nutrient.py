@@ -23,13 +23,13 @@ class NutrientFactBuilder:
         "phosphorus_mgkg",
         "sodium_mgkg",
         "potassium_mgkg",
+        "metabolizable_energy_kcalkg",
     )
 
     def __init__(self) -> None:
 
-        self.timestamp = datetime.now(
-            UTC,
-        ).replace(hour=0, minute=0, second=0, microsecond=0)
+        # Usar horário local para evitar confusão de timezone no Excel/Power BI (ex: 21:00 do dia anterior)
+        self.timestamp = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
     def build(
         self,

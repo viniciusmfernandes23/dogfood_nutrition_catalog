@@ -92,9 +92,7 @@ class WarehouseExporter:
     ) -> Path:
 
         metadata = {
-            "generated_at": datetime.now(
-                UTC,
-            ).isoformat(),
+            "generated_at": datetime.now().isoformat(),
             "files": {
                 name: {
                     "path": str(path),

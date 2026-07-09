@@ -35,9 +35,7 @@ class ProductDimensionBuilder:
 
     def __init__(self) -> None:
 
-        self.timestamp = datetime.now(
-            UTC,
-        )
+        self.timestamp = datetime.now()
 
     def build(
         self,
