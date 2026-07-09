@@ -48,9 +48,9 @@ class Resolver:
                 for _ in range(4): # Tenta até 4 níveis de escala acumulada
                     test_val /= factor
                     if self.validator.is_valid(test_val, rule):
-                        nutrient.original_value = nutrient.value
-                        nutrient.value = test_val
-                        nutrient.status = ValidationStatus.AUTO_CORRECTED
+                    nutrient.original_value = nutrient.value
+                    nutrient.value = round(float(test_val), 2)
+                    nutrient.status = ValidationStatus.AUTO_CORRECTED
                         nutrient.rule_applied = f"fix_accumulated_scale_{int(factor)}"
                         nutrient.confidence = 1.0
                         print(f"[AUDIT] Valor corrigido recursivamente ({factor}): {nutrient.value}")
@@ -85,7 +85,7 @@ class Resolver:
             )
             if converted_value is not None and self.validator.is_valid(converted_value, rule):
                 nutrient.original_value = nutrient.value
-                nutrient.value = converted_value
+                nutrient.value = round(float(converted_value), 2)
                 nutrient.status = ValidationStatus.AUTO_CORRECTED
                 nutrient.rule_applied = f"unit_direct_{rule_name}"
                 nutrient.confidence = 1.0  # Confiança máxima com unidade explícita
@@ -98,7 +98,7 @@ class Resolver:
         if self.validator.has_single_candidate(candidates):
             value, applied_rule = candidates[0]
             nutrient.original_value = nutrient.value
-            nutrient.value = value
+            nutrient.value = round(float(value), 2)
             nutrient.status = ValidationStatus.AUTO_CORRECTED
             nutrient.rule_applied = applied_rule
             nutrient.confidence = get_confidence(applied_rule)
