@@ -212,6 +212,18 @@ class Resolver:
         if rule.gkg_to_mgkg:
             candidates.append((value * GKG_TO_MGKG_FACTOR, "gkg_to_mgkg"))
 
+        # 5. Deslocamento Decimal para baixo (Heurística para escala 10x/100x em macros/minerais)
+        # Se o valor estiver acima do máximo, tentamos divisões por 10 e 100
+        if value > rule.target_max:
+            candidates.append((value / 10.0, "decimal_shift_down_10"))
+            candidates.append((value / 100.0, "decimal_shift_down_100"))
+
+        # 6. Heurística para valores extremamente baixos (ex: Energia 29-100 kcal/kg)
+        if value < rule.target_min:
+            candidates.append((value * 10.0, "decimal_shift_up_10"))
+            candidates.append((value * 100.0, "decimal_shift_up_100"))
+            candidates.append((value * 1000.0, "decimal_shift_up_1000"))
+
         return candidates
 
 

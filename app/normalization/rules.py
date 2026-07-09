@@ -35,7 +35,8 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         field="protein_gkg",
         target_min=60,
         target_max=600,
-        overscale_factor=10, # Reativado para lidar com resíduos de 10x
+        overscale_factor=10,
+        decimal_shift_factor=10, # Trata 2500 -> 250
         percent_factor=PERCENT_TO_GKG_FACTOR,
     ),
 
@@ -44,6 +45,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         target_min=20,
         target_max=400,
         overscale_factor=10,
+        decimal_shift_factor=10,
         percent_factor=PERCENT_TO_GKG_FACTOR,
     ),
 
@@ -52,6 +54,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         target_min=5,
         target_max=250,
         overscale_factor=10,
+        decimal_shift_factor=10,
         percent_factor=PERCENT_TO_GKG_FACTOR,
     ),
 
@@ -59,14 +62,17 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         field="ash_gkg",
         target_min=10,
         target_max=200,
-        overscale_factor=10, # Permite corrigir se o valor 10x chegar aqui por erro de fluxo
+        overscale_factor=10,
+        decimal_shift_factor=10,
         percent_factor=PERCENT_TO_GKG_FACTOR,
     ),
 
     "moisture_gkg": NormalizationRule(
         field="moisture_gkg",
         target_min=60,
-        target_max=900,
+        target_max=950, # Aumentado para 95% para rações úmidas extremas
+        overscale_factor=10,
+        decimal_shift_factor=10, # Trata 8200 -> 820
         percent_factor=PERCENT_TO_GKG_FACTOR,
     ),
 
@@ -78,8 +84,8 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         field="calcium_min_mgkg",
         target_min=1500,
         target_max=50000,
-        overscale_factor=10, # Permite corrigir se o valor 10x chegar aqui
-        decimal_shift_factor=100,
+        overscale_factor=10,
+        decimal_shift_factor=100, # Trata 15.0 -> 1500
         percent_factor=PERCENT_TO_MGKG_FACTOR,
         gkg_to_mgkg=True,
     ),
@@ -88,7 +94,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         field="calcium_max_mgkg",
         target_min=1500,
         target_max=50000,
-        overscale_factor=10, # Permite corrigir se o valor 10x chegar aqui
+        overscale_factor=10,
         decimal_shift_factor=100,
         percent_factor=PERCENT_TO_MGKG_FACTOR,
         gkg_to_mgkg=True,
@@ -99,6 +105,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         target_min=1000,
         target_max=30000,
         overscale_factor=10,
+        decimal_shift_factor=100, # Trata 10.0 -> 1000
         percent_factor=PERCENT_TO_MGKG_FACTOR,
         gkg_to_mgkg=True,
     ),
@@ -106,8 +113,9 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     "sodium_mgkg": NormalizationRule(
         field="sodium_mgkg",
         target_min=800,
-        target_max=20000,
+        target_max=30000, # Aumentado para 3% para petiscos salgados
         overscale_factor=10,
+        decimal_shift_factor=100,
         percent_factor=PERCENT_TO_MGKG_FACTOR,
         gkg_to_mgkg=True,
     ),
@@ -116,17 +124,18 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         field="potassium_mgkg",
         target_min=1500,
         target_max=50000,
-        overscale_factor=10, # Permite corrigir se o valor 10x chegar aqui
+        overscale_factor=10,
+        decimal_shift_factor=100,
         percent_factor=PERCENT_TO_MGKG_FACTOR,
         gkg_to_mgkg=True,
     ),
 
     "metabolizable_energy_kcalkg": NormalizationRule(
         field="metabolizable_energy_kcalkg",
-        target_min=2000,
-        target_max=6000,
-        overscale_factor=10, # Corrige se o valor vier 10x maior (ex: 35000 -> 3500)
-        decimal_shift_factor=1000, # Caso venha em kcal/g (ex: 3.5 -> 3500)
+        target_min=500, # Reduzido para aceitar dietas líquidas/sopas (0.5 kcal/g)
+        target_max=6500, # Aumentado levemente para petiscos hipercalóricos
+        overscale_factor=10, # Trata 35000 -> 3500
+        decimal_shift_factor=1000, # Trata 3.5 -> 3500
     ),
 
 }
