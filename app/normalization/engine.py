@@ -103,6 +103,52 @@ class NormalizationEngine:
             report.changed_records += 1
         else:
             report.unchanged_records += 1
+            
+        # Auditoria de Coerência Nutricional (v1.3.0)
+        self._audit_biological_coherence(df, index, product_id)
+
+    def _audit_biological_coherence(self, df: pd.DataFrame, index: int, product_id: Any) -> None:
+        """
+        Realiza validações cruzadas para garantir a integridade biológica do produto.
+        """
+        # 1. Inversão Mínimo vs Máximo (Cálcio)
+        ca_min = df.at[index, "calcium_min_mgkg"]
+        ca_max = df.at[index, "calcium_max_mgkg"]
+        if pd.notna(ca_min) and pd.notna(ca_max) and ca_min > ca_max:
+            print(f"[BIOLOGICAL AUDIT] Inversão Ca Min/Max detectada no produto {product_id}. Trocando valores.")
+            df.at[index, "calcium_min_mgkg"], df.at[index, "calcium_max_mgkg"] = ca_max, ca_min
+
+        # 2. Soma de Macronutrientes (Proteína + Gordura + Fibra + Cinzas <= 1000 g/kg)
+        macros = ["protein_gkg", "fat_gkg", "fiber_gkg", "ash_gkg"]
+        macro_sum = sum(df.at[index, m] for m in macros if pd.notna(df.at[index, m]))
+        if macro_sum > 1000:
+            print(f"[BIOLOGICAL AUDIT] Soma de macros ({macro_sum}g/kg) impossível no produto {product_id}. Anulando valores suspeitos.")
+            for m in macros:
+                if pd.notna(df.at[index, m]) and df.at[index, m] > 600: # Valor individual bizarro
+                    df.at[index, m] = None
+
+        # 3. Razão Cálcio : Fósforo (Ideal 1:1 a 2:1)
+        # Se Ca:P < 0.5 ou Ca:P > 3.0, há algo muito errado (exceto dietas específicas)
+        p = df.at[index, "phosphorus_mgkg"]
+        ca = df.at[index, "calcium_min_mgkg"] or df.at[index, "calcium_max_mgkg"]
+        if pd.notna(ca) and pd.notna(p) and p > 0:
+            ratio = ca / p
+            if ratio < 0.5 or ratio > 4.0:
+                print(f"[BIOLOGICAL AUDIT] Razão Ca:P bizarra ({ratio:.2f}) no produto {product_id}. Sinalizando para revisão.")
+                # Não anulamos automaticamente aqui para evitar perda de dados legítimos, 
+                # mas poderíamos anular se ratio > 10 por exemplo.
+
+        # 4. Coerência Energia vs Umidade
+        # Umidade > 70% (700g/kg) -> Energia raramente > 2000 kcal/kg (exceto se for gordura pura)
+        moisture = df.at[index, "moisture_gkg"]
+        energy = df.at[index, "metabolizable_energy_kcalkg"]
+        if pd.notna(moisture) and pd.notna(energy):
+            if moisture > 700 and energy > 2500:
+                print(f"[BIOLOGICAL AUDIT] Inconsistência Energia/Umidade no produto {product_id} ({moisture}g/kg umidade e {energy}kcal/kg).")
+                # Se umidade é 85% e energia é 4000, provavelmente a energia é 400 (por porção) ou 4000 (base seca).
+                # Como o padrão do catálogo é base úmida, dividimos por 10 se for > 2500 em ração úmida.
+                if energy > 2500:
+                    df.at[index, "metabolizable_energy_kcalkg"] = round(energy / 10.0, 2)
 
     def normalize_dataframe(
         self,
