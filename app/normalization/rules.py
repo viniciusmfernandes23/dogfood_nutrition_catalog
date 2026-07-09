@@ -125,7 +125,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         field="metabolizable_energy_kcalkg",
         target_min=2000,
         target_max=6000,
-        overscale_factor=1,
+        overscale_factor=10, # Corrige se o valor vier 10x maior (ex: 35000 -> 3500)
         decimal_shift_factor=1000, # Caso venha em kcal/g (ex: 3.5 -> 3500)
     ),
 

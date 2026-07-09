@@ -35,10 +35,26 @@ class Resolver:
             nutrient.confidence = 0.0
             return nutrient
 
+        # Proteção contra valores astronômicos (artefatos de bugs anteriores ou erros de leitura)
+        # Valores acima de 1.000.000 são biologicamente impossíveis para qualquer nutriente no catálogo.
+        if nutrient.value > 1_000_000:
+            nutrient.status = ValidationStatus.IMPLAUSIBLE
+            nutrient.rule_applied = "implausible_extreme_value"
+            nutrient.confidence = 0.0
+            return nutrient
+
         if rule is None:
             return nutrient
 
-        # 1. Prioridade absoluta: Unidade original detectada pelo parser
+        # 1. Se o valor já está no range e parece plausível, aceitamos IMEDIATAMENTE.
+        # Isso evita re-normalização de valores que já estão corretos (ex: 1700 mg/kg ou 3500 kcal/kg).
+        if self.validator.is_valid(nutrient.value, rule):
+            nutrient.status = ValidationStatus.NORMALIZED
+            nutrient.rule_applied = "already_normalized"
+            nutrient.confidence = get_confidence("already_normalized")
+            return nutrient
+
+        # 2. Prioridade: Unidade original detectada pelo parser
         if nutrient.original_unit:
             converted_value, rule_name = self._resolve_by_unit(
                 nutrient.value, 
@@ -52,13 +68,6 @@ class Resolver:
                 nutrient.rule_applied = f"unit_direct_{rule_name}"
                 nutrient.confidence = 1.0  # Confiança máxima com unidade explícita
                 return nutrient
-
-        # 2. Se o valor já está no range, aceitamos (mas só se não houver unidade contraditória)
-        if self.validator.is_valid(nutrient.value, rule):
-            nutrient.status = ValidationStatus.NORMALIZED
-            nutrient.rule_applied = "already_normalized"
-            nutrient.confidence = get_confidence("already_normalized")
-            return nutrient
 
         # 3. Fallback: Busca exaustiva por candidatos válidos
         candidates = self._build_candidates(nutrient.value, rule)

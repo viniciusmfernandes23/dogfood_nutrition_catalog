@@ -26,10 +26,12 @@ class NutrientFactBuilder:
         "metabolizable_energy_kcalkg",
     )
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        timestamp: datetime | None = None,
+    ) -> None:
 
-        # Usar horário local para evitar confusão de timezone no Excel/Power BI (ex: 21:00 do dia anterior)
-        self.timestamp = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        self.timestamp = timestamp or datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
     def build(
         self,

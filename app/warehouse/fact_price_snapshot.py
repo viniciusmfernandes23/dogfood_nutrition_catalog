@@ -12,10 +12,12 @@ class PriceSnapshotFactBuilder:
     Constrói a tabela fato de preços.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        timestamp: datetime | None = None,
+    ) -> None:
 
-        # Usar horário local para evitar confusão de timezone no Excel/Power BI
-        self.timestamp = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        self.timestamp = timestamp or datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
     def build(
         self,

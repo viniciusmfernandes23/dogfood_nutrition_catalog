@@ -33,9 +33,12 @@ class ProductDimensionBuilder:
         "_kcalkg",
     )
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        timestamp: datetime | None = None,
+    ) -> None:
 
-        self.timestamp = datetime.now()
+        self.timestamp = timestamp or datetime.now()
 
     def build(
         self,

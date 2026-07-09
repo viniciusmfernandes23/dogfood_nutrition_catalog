@@ -22,12 +22,15 @@ class WarehousePipeline:
         self,
         output_dir: str = "data/output/warehouse",
     ) -> None:
+        # Timestamp único para toda a execução do warehouse para garantir consistência entre tabelas
+        # Usar horário local para evitar confusão de timezone no Excel/Power BI
+        self.timestamp = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
-        self.dim_builder = ProductDimensionBuilder()
+        self.dim_builder = ProductDimensionBuilder(timestamp=self.timestamp)
 
-        self.nutrient_builder = NutrientFactBuilder()
+        self.nutrient_builder = NutrientFactBuilder(timestamp=self.timestamp)
 
-        self.price_builder = PriceSnapshotFactBuilder()
+        self.price_builder = PriceSnapshotFactBuilder(timestamp=self.timestamp)
 
         self.exporter = WarehouseExporter(
             output_dir=output_dir,
