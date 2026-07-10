@@ -147,7 +147,16 @@ class NormalizationEngine:
             print(f"[BIOLOGICAL AUDIT] Energia excede limite físico da matéria orgânica ({energy} kcal/kg) no produto {product_id}. Anulando.")
             df.at[index, "metabolizable_energy_kcalkg"] = None
 
-        # 5. Razão Cálcio : Fósforo (Auditoria de Toxicidade/Deficiência)
+        # 5. Coerência Cinzas vs Minerais
+        ash = df.at[index, "ash_gkg"]
+        minerals_mgkg = ["sodium_mgkg", "potassium_mgkg", "calcium_max_mgkg", "phosphorus_mgkg"]
+        minerals_sum_gkg = sum(df.at[index, m] / 1000.0 for m in minerals_mgkg if pd.notna(df.at[index, m]))
+        if pd.notna(ash) and minerals_sum_gkg > ash * 1.2: # Tolerância de 20%
+            print(f"[BIOLOGICAL AUDIT] Soma de minerais ({minerals_sum_gkg}g/kg) excede cinzas ({ash}g/kg) no produto {product_id}. Anulando minerais suspeitos.")
+            for m in minerals_mgkg:
+                df.at[index, m] = None
+
+        # 6. Razão Cálcio : Fósforo (Auditoria de Toxicidade/Deficiência)
         p = df.at[index, "phosphorus_mgkg"]
         ca = df.at[index, "calcium_min_mgkg"] or df.at[index, "calcium_max_mgkg"]
         if pd.notna(ca) and pd.notna(p) and p > 0:
