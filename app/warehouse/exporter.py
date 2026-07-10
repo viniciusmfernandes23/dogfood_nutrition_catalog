@@ -136,6 +136,15 @@ class WarehouseExporter:
         filename: str,
         append: bool = False
     ) -> Path:
+        output_file = (
+            self.output_dir
+            / filename
+        )
+
+        # Se o DataFrame estiver vazio, não fazemos nada (evita sobrescrever arquivos com vazio no modo price)
+        if dataframe is None or dataframe.empty:
+            return output_file
+
         # Barreira de Sanidade Final (v1.3.2): Validação biológica obrigatória antes da escrita
         if filename == "fact_nutrient.csv" and "nutrient_value" in dataframe.columns:
             self._apply_final_biological_sanity_check(dataframe)
@@ -143,6 +152,62 @@ class WarehouseExporter:
 
         if filename == "fact_price_snapshot.csv" and "price" in dataframe.columns:
             dataframe["price"] = dataframe["price"].round(2)
+
+        # Se for append e o arquivo já existir, carregamos o existente para evitar duplicatas
+        if append and output_file.exists():
+            try:
+                # Carrega o arquivo existente
+                existing_df = pd.read_csv(output_file, encoding="utf-8-sig")
+                
+                # Garante tipos consistentes para detecção de duplicatas
+                for col in ["product_id", "collected_at", "nutrient_name"]:
+                    if col in existing_df.columns:
+                        existing_df[col] = existing_df[col].astype(str)
+                    if col in dataframe.columns:
+                        dataframe[col] = dataframe[col].astype(str)
+
+                # Concatenamos
+                combined_df = pd.concat([existing_df, dataframe], ignore_index=True)
+                
+                # Identifica colunas para detecção de duplicatas
+                subset = ["product_id"]
+                if "collected_at" in combined_df.columns:
+                    subset.append("collected_at")
+                if "nutrient_name" in combined_df.columns:
+                    subset.append("nutrient_name")
+                
+                # Garantir que collected_at seja datetime para ordenação correta
+                if "collected_at" in combined_df.columns:
+                    combined_df["collected_at_dt"] = pd.to_datetime(combined_df["collected_at"])
+                    # Ordena por data para que 'last' seja realmente o mais recente
+                    combined_df = combined_df.sort_values(by="collected_at_dt")
+                
+                # Ajuste: No caso de fact_price_snapshot, a deduplicação deve usar apenas a data (sem hora)
+                # pois o pipeline atualiza os preços diariamente
+                if filename == "fact_price_snapshot.csv" and "collected_at" in combined_df.columns:
+                    # Cria coluna temporária apenas com a data para deduplicação
+                    combined_df["_date_only"] = combined_df["collected_at_dt"].dt.date
+                    subset = ["product_id", "_date_only"]
+                    combined_df = combined_df.drop_duplicates(subset=subset, keep='last')
+                    combined_df = combined_df.drop(columns=["_date_only"])
+                else:
+                    # Remove duplicatas (mantém a versão mais recente se houver conflito no mesmo timestamp)
+                    combined_df = combined_df.drop_duplicates(subset=subset, keep='last')
+                
+                if "collected_at_dt" in combined_df.columns:
+                    combined_df = combined_df.drop(columns=["collected_at_dt"])
+                
+                dataframe = combined_df
+            except Exception as e:
+                print(f"Erro ao carregar histórico ({filename}): {e}. Sobrescrevendo...")
+
+        dataframe.to_csv(
+            output_file,
+            index=False,
+            encoding="utf-8-sig",
+        )
+
+        return output_file
 
     def _apply_final_biological_sanity_check(self, df: pd.DataFrame) -> None:
         """
@@ -203,67 +268,6 @@ class WarehouseExporter:
                     print(f"[FINAL SANITY BARRIER] Soma de macros impossível ({total_sum}g/kg) no produto {product_id}. Anulando nutrientes.")
                     df.loc[prod_mask & (df["nutrient_name"].isin(macro_fields)), "nutrient_value"] = None
                     df.loc[prod_mask & (df["nutrient_name"] == "metabolizable_energy_kcalkg"), "nutrient_value"] = None
-
-        output_file = (
-            self.output_dir
-            / filename
-        )
-
-        # Se for append e o arquivo já existir, carregamos o existente para evitar duplicatas
-        if append and output_file.exists():
-            try:
-                # Carrega o arquivo existente
-                existing_df = pd.read_csv(output_file, encoding="utf-8-sig")
-                
-                # Garante tipos consistentes para detecção de duplicatas
-                for col in ["product_id", "collected_at", "nutrient_name"]:
-                    if col in existing_df.columns:
-                        existing_df[col] = existing_df[col].astype(str)
-                    if col in dataframe.columns:
-                        dataframe[col] = dataframe[col].astype(str)
-
-                # Concatenamos
-                combined_df = pd.concat([existing_df, dataframe], ignore_index=True)
-                
-                # Identifica colunas para detecção de duplicatas
-                subset = ["product_id"]
-                if "collected_at" in combined_df.columns:
-                    subset.append("collected_at")
-                if "nutrient_name" in combined_df.columns:
-                    subset.append("nutrient_name")
-                
-                # Garantir que collected_at seja datetime para ordenação correta
-                if "collected_at" in combined_df.columns:
-                    combined_df["collected_at_dt"] = pd.to_datetime(combined_df["collected_at"])
-                    # Ordena por data para que 'last' seja realmente o mais recente
-                    combined_df = combined_df.sort_values(by="collected_at_dt")
-                
-                # Ajuste: No caso de fact_price_snapshot, a deduplicação deve usar apenas a data (sem hora)
-                # pois o pipeline atualiza os preços diariamente
-                if filename == "fact_price_snapshot.csv" and "collected_at" in combined_df.columns:
-                    # Cria coluna temporária apenas com a data para deduplicação
-                    combined_df["_date_only"] = combined_df["collected_at_dt"].dt.date
-                    subset = ["product_id", "_date_only"]
-                    combined_df = combined_df.drop_duplicates(subset=subset, keep='last')
-                    combined_df = combined_df.drop(columns=["_date_only"])
-                else:
-                    # Remove duplicatas (mantém a versão mais recente se houver conflito no mesmo timestamp)
-                    combined_df = combined_df.drop_duplicates(subset=subset, keep='last')
-                
-                if "collected_at_dt" in combined_df.columns:
-                    combined_df = combined_df.drop(columns=["collected_at_dt"])
-                
-                dataframe = combined_df
-            except Exception as e:
-                print(f"Erro ao carregar histórico ({filename}): {e}. Sobrescrevendo...")
-
-        dataframe.to_csv(
-            output_file,
-            index=False,
-            encoding="utf-8-sig",
-        )
-
-        return output_file
 
     # ==========================================================
     # Helpers
