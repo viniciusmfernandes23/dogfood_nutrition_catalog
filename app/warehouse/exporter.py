@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+from app.normalization.semantic import SemanticLayer
 
 
 class WarehouseExporter:
@@ -160,9 +161,9 @@ class WarehouseExporter:
         if filename == "fact_nutrient.csv" and "nutrient_value" in dataframe.columns:
             self._apply_final_biological_sanity_check(dataframe)
             
-            # Converte da escala interna (décimos) para a escala real para consumo no BI
-            # Ex: 2900 -> 290.0 g/kg
-            dataframe["nutrient_value"] = (dataframe["nutrient_value"] / 10.0).round(2)
+            # Aplica a Camada Semântica orientada por metadados
+            # Converte da escala técnica interna para a escala de negócio real
+            dataframe = SemanticLayer.apply_output_conversion(dataframe)
 
         if filename == "fact_price_snapshot.csv" and "price" in dataframe.columns:
             dataframe["price"] = dataframe["price"].round(2)
