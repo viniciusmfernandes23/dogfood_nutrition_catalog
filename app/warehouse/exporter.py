@@ -141,8 +141,19 @@ class WarehouseExporter:
             / filename
         )
 
-        # Se o DataFrame estiver vazio, não fazemos nada (evita sobrescrever arquivos com vazio no modo price)
+        # Se o DataFrame estiver vazio, garantimos que o arquivo exista (mesmo vazio) para evitar erros em scripts externos
         if dataframe is None or dataframe.empty:
+            if not output_file.exists():
+                # Cria um arquivo vazio com cabeçalhos padrão baseados no nome do arquivo
+                headers = ["product_id"]
+                if "fact_nutrient" in filename:
+                    headers = ["product_id", "nutrient_name", "nutrient_value", "collected_at"]
+                elif "fact_price" in filename:
+                    headers = ["product_id", "price", "collected_at"]
+                elif "dim_product" in filename:
+                    headers = ["product_id", "name", "brand", "category"]
+                
+                pd.DataFrame(columns=headers).to_csv(output_file, index=False, encoding="utf-8-sig")
             return output_file
 
         # Barreira de Sanidade Final (v1.3.2): Validação biológica obrigatória antes da escrita
