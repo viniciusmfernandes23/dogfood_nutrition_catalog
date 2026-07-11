@@ -312,13 +312,16 @@ class WarehouseExporter:
     ) -> None:
         """
         Limpa o diretório de saída.
-        Se full_clean=True, remove tudo. Caso contrário, preserva histórico de preços.
-        Nota: fact_nutrient.csv nunca é preservado para evitar acúmulo de valores de escala errados.
+        Se full_clean=True, remove tudo para uma nova execução completa.
+        Caso contrário (incremental), preserva os arquivos existentes do Data Warehouse.
         """
-        preserved_files = [] if full_clean else ["fact_price_snapshot.csv"]
-        for file in self.output_dir.iterdir():
-            if file.is_file() and file.name not in preserved_files:
-                file.unlink()
+        if full_clean:
+            for file in self.output_dir.iterdir():
+                if file.is_file():
+                    file.unlink()
+        else:
+            # Em modo incremental/price, não apagamos nada para garantir a integridade do DW
+            print("[WAREHOUSE] Modo incremental: Preservando arquivos existentes no diretório de saída.")
 
     def file_exists(
         self,
