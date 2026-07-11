@@ -93,7 +93,6 @@ class NormalizationEngine:
                     rule_applied=result.rule_applied,
                     status=result.status,
                     confidence_score=result.confidence,
-                    confidence_score=result.confidence,
                 )
             )
 
