@@ -221,8 +221,8 @@ class WarehouseExporter:
         macro_fields = ["protein_gkg", "fat_gkg", "fiber_gkg", "ash_gkg", "moisture_gkg"]
         mask_macro_extreme = (df["nutrient_name"].isin(macro_fields)) & (df["nutrient_value"] > 1000)
         
-        # Energia não pode exceder 9000 kcal/kg (limite da gordura pura)
-        mask_energy_extreme = (df["nutrient_name"] == "metabolizable_energy_kcalkg") & (df["nutrient_value"] > 9000)
+        # Energia não pode exceder 9000 kcal/kg (limite da gordura pura) e nem ser inferior a 100 kcal/kg
+        mask_energy_extreme = (df["nutrient_name"] == "metabolizable_energy_kcalkg") & ((df["nutrient_value"] > 9000) | (df["nutrient_value"] < 100))
         
         # Minerais não podem exceder 60.000 mg/kg (6%)
         mineral_fields = ["sodium_mgkg", "potassium_mgkg", "calcium_min_mgkg", "calcium_max_mgkg", "phosphorus_mgkg"]

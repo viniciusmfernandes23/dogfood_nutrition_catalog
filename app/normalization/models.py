@@ -120,6 +120,12 @@ class DatasetNormalizationReport:
 
     auto_corrected_records: int = 0
 
+    nullified_records: int = 0
+
+    nutrient_stats: dict[str, dict[str, int]] = field(
+        default_factory=dict,
+    )
+
     logs: list[NormalizationLog] = field(
         default_factory=list,
     )
@@ -128,8 +134,18 @@ class DatasetNormalizationReport:
         self,
         log: NormalizationLog,
     ) -> None:
-
         self.logs.append(log)
+        
+        # Atualiza estatísticas por nutriente
+        if log.field not in self.nutrient_stats:
+            self.nutrient_stats[log.field] = {"processed": 0, "nullified": 0, "corrected": 0}
+        
+        self.nutrient_stats[log.field]["processed"] += 1
+        if log.normalized_value is None and log.original_value is not None:
+            self.nutrient_stats[log.field]["nullified"] += 1
+            self.nullified_records += 1
+        elif log.status == ValidationStatus.AUTO_CORRECTED:
+            self.nutrient_stats[log.field]["corrected"] += 1
 
     @property
     def success_rate(

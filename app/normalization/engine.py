@@ -144,9 +144,13 @@ class NormalizationEngine:
                     df.at[index, "metabolizable_energy_kcalkg"] = round(energy / 10.0, 2)
 
         # 4. Limite Físico Absoluto de Energia (Gordura pura = 9000 kcal/kg)
-        if pd.notna(energy) and energy > 9000:
-            print(f"[BIOLOGICAL AUDIT] Energia excede limite físico da matéria orgânica ({energy} kcal/kg) no produto {product_id}. Anulando.")
-            df.at[index, "metabolizable_energy_kcalkg"] = None
+        if pd.notna(energy):
+            if energy > 9000:
+                print(f"[BIOLOGICAL AUDIT] Energia excede limite físico da matéria orgânica ({energy} kcal/kg) no produto {product_id}. Anulando.")
+                df.at[index, "metabolizable_energy_kcalkg"] = None
+            elif energy < 100:
+                print(f"[BIOLOGICAL AUDIT] Energia abaixo do limite mínimo plausível ({energy} kcal/kg) no produto {product_id}. Anulando.")
+                df.at[index, "metabolizable_energy_kcalkg"] = None
 
         # 5. Coerência Cinzas vs Minerais
         ash = df.at[index, "ash_gkg"]
@@ -311,15 +315,24 @@ class NormalizationEngine:
     @staticmethod
     def generate_summary(
         report: DatasetNormalizationReport,
-    ) -> dict[str, int | float]:
+    ) -> dict[str, Any]:
 
-        return {
+        summary = {
             "processed_records": report.processed_records,
             "changed_records": report.changed_records,
             "unchanged_records": report.unchanged_records,
             "auto_corrected_records": report.auto_corrected_records,
+            "nullified_records": report.nullified_records,
             "manual_review_records": report.manual_review_records,
             "ambiguous_records": report.ambiguous_records,
             "implausible_records": report.implausible_records,
             "success_rate": report.success_rate,
+            "nutrient_nullification_rates": {}
         }
+        
+        for nutrient, stats in report.nutrient_stats.items():
+            if stats["processed"] > 0:
+                rate = round((stats["nullified"] / stats["processed"]) * 100, 2)
+                summary["nutrient_nullification_rates"][nutrient] = f"{rate}%"
+                
+        return summary
