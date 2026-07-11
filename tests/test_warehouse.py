@@ -259,6 +259,34 @@ def test_export_all(
     ).exists()
 
 
+def test_export_fact_creates_csv_for_empty_dataframe(
+    tmp_path: Path,
+):
+
+    exporter = WarehouseExporter(
+        output_dir=tmp_path,
+    )
+
+    empty_df = pd.DataFrame(
+        columns=[
+            "product_id",
+            "nutrient_name",
+            "nutrient_value",
+            "collected_at",
+        ]
+    )
+
+    output_path = exporter.export_fact(
+        empty_df,
+        "fact_nutrient.csv",
+    )
+
+    assert output_path.exists()
+    assert "nutrient_name" in output_path.read_text(
+        encoding="utf-8-sig"
+    )
+
+
 def test_pipeline_builds_tables(
     tmp_path: Path,
 ):
