@@ -2,6 +2,8 @@
 
 Este documento define formalmente as unidades de armazenamento, tipos de dados e regras de integridade biológica aplicadas no `Dogfood Nutrition Catalog`.
 
+> **Nota sobre Escala Técnica:** Internamente, o pipeline utiliza uma **escala de décimos (fator 10x)** para processamento e armazenamento temporário (ex: 290 g/kg é processado como 2900). No entanto, a **camada de exportação (Warehouse)** realiza a conversão automática para as unidades reais listadas abaixo, garantindo que o consumo em ferramentas de BI (Power BI, Excel) seja direto e sem necessidade de divisores manuais.
+
 ## 1. Unidades de Armazenamento (Target Units)
 
 Para garantir a comparabilidade entre produtos, todos os nutrientes são normalizados para as seguintes unidades padrão:

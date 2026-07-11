@@ -159,7 +159,10 @@ class WarehouseExporter:
         # Barreira de Sanidade Final (v1.3.2): Validação biológica obrigatória antes da escrita
         if filename == "fact_nutrient.csv" and "nutrient_value" in dataframe.columns:
             self._apply_final_biological_sanity_check(dataframe)
-            dataframe["nutrient_value"] = dataframe["nutrient_value"].round(2)
+            
+            # Converte da escala interna (décimos) para a escala real para consumo no BI
+            # Ex: 2900 -> 290.0 g/kg
+            dataframe["nutrient_value"] = (dataframe["nutrient_value"] / 10.0).round(2)
 
         if filename == "fact_price_snapshot.csv" and "price" in dataframe.columns:
             dataframe["price"] = dataframe["price"].round(2)
