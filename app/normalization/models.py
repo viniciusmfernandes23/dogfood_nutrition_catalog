@@ -97,6 +97,8 @@ class NormalizationLog:
 
     status: ValidationStatus
 
+    confidence_score: float = 1.0
+
 
 @dataclass(slots=True)
 class DatasetNormalizationReport:

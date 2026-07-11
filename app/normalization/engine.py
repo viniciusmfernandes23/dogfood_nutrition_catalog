@@ -92,6 +92,8 @@ class NormalizationEngine:
                     normalized_value=result.normalized_value,
                     rule_applied=result.rule_applied,
                     status=result.status,
+                    confidence_score=result.confidence,
+                    confidence_score=result.confidence,
                 )
             )
 
@@ -151,7 +153,7 @@ class NormalizationEngine:
         ash = df.at[index, "ash_gkg"]
         minerals_mgkg = ["sodium_mgkg", "potassium_mgkg", "calcium_max_mgkg", "phosphorus_mgkg"]
         minerals_sum_gkg = sum(df.at[index, m] / 1000.0 for m in minerals_mgkg if pd.notna(df.at[index, m]))
-        if pd.notna(ash) and minerals_sum_gkg > ash * 1.2: # Tolerância de 20%
+        if pd.notna(ash) and minerals_sum_gkg >= ash: # A soma dos minerais não deve exceder o teor de cinzas
             print(f"[BIOLOGICAL AUDIT] Soma de minerais ({minerals_sum_gkg}g/kg) excede cinzas ({ash}g/kg) no produto {product_id}. Anulando minerais suspeitos.")
             for m in minerals_mgkg:
                 df.at[index, m] = None
@@ -167,12 +169,13 @@ class NormalizationEngine:
                 df.at[index, "calcium_max_mgkg"] = None
                 df.at[index, "phosphorus_mgkg"] = None
 
-        # 6. Trava de Toxicidade para Minerais (Sódio/Potássio)
+        # 7. Trava de Toxicidade para Minerais (Sódio/Potássio)
         for mineral in ["sodium_mgkg", "potassium_mgkg"]:
             val = df.at[index, mineral]
             if pd.notna(val) and val > 60000: # 6% de mineral é letal/impossível
                 print(f"[BIOLOGICAL AUDIT] Nível tóxico/impossível de {mineral} ({val} mg/kg) no produto {product_id}. Anulando.")
                 df.at[index, mineral] = None
+
 
     def normalize_dataframe(
         self,
@@ -299,6 +302,7 @@ class NormalizationEngine:
                     "normalized_value": log.normalized_value,
                     "rule_applied": log.rule_applied,
                     "status": log.status.value,
+                    "confidence_score": log.confidence_score,
                 }
                 for log
                 in report.logs
