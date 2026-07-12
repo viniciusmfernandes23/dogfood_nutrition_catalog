@@ -113,6 +113,16 @@ class NormalizationEngine:
         Realiza validações cruzadas rigorosas para garantir a integridade biológica do produto.
         v1.3.1: Foco em anulação de dados impossíveis e âncora de umidade.
         """
+        # Garante que todas as colunas necessárias existam para evitar KeyError
+        required_cols = [
+            "protein_gkg", "fat_gkg", "fiber_gkg", "ash_gkg", "moisture_gkg",
+            "calcium_min_mgkg", "calcium_max_mgkg", "phosphorus_mgkg",
+            "sodium_mgkg", "potassium_mgkg", "metabolizable_energy_kcalkg"
+        ]
+        for col in required_cols:
+            if col not in df.columns:
+                df[col] = None
+
         # 1. Inversão Mínimo vs Máximo (Cálcio)
         ca_min = df.at[index, "calcium_min_mgkg"]
         ca_max = df.at[index, "calcium_max_mgkg"]
@@ -123,7 +133,7 @@ class NormalizationEngine:
         # 2. Soma de Macronutrientes (Proteína + Gordura + Fibra + Cinzas + Umidade <= 1000 g/kg)
         macros_all = ["protein_gkg", "fat_gkg", "fiber_gkg", "ash_gkg", "moisture_gkg"]
         macro_sum = sum(df.at[index, m] for m in macros_all if pd.notna(df.at[index, m]))
-        if macro_sum > 1050: # Tolerância de 5% para erros de arredondamento em rótulos
+        if macro_sum > 1100: # Aumentado para 10% de tolerância devido a imprecisões frequentes em rótulos brasileiros
             print(f"[BIOLOGICAL AUDIT] Soma total de nutrientes ({macro_sum}g/kg) impossível no produto {product_id}. Anulando linha nutricional.")
             for m in macros_all:
                 df.at[index, m] = None
@@ -163,7 +173,10 @@ class NormalizationEngine:
 
         # 6. Razão Cálcio : Fósforo (Auditoria de Toxicidade/Deficiência)
         p = df.at[index, "phosphorus_mgkg"]
-        ca = df.at[index, "calcium_min_mgkg"] or df.at[index, "calcium_max_mgkg"]
+        ca_min_val = df.at[index, "calcium_min_mgkg"]
+        ca_max_val = df.at[index, "calcium_max_mgkg"]
+        ca = ca_min_val if pd.notna(ca_min_val) else ca_max_val
+        
         if pd.notna(ca) and pd.notna(p) and p > 0:
             ratio = ca / p
             if ratio < 0.4 or ratio > 5.0:

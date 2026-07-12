@@ -215,8 +215,13 @@ class Resolver:
         # 3. Conversão g/kg para mg/kg (Multiplicação por 1000)
         if rule.gkg_to_mgkg:
             candidates.append((value * GKG_TO_MGKG_FACTOR, "gkg_to_mgkg"))
+            
+        # 4. Decimal Shift (Multiplicação pelo fator definido na regra)
+        # Útil para casos como Cálcio 1.5 -> 1500 mg/kg
+        if rule.decimal_shift_factor:
+            candidates.append((value * rule.decimal_shift_factor, "decimal_shift"))
 
-        # 4. Deslocamento Decimal descendente (Heurística de segurança para valores altos)
+        # 5. Deslocamento Decimal descendente (Heurística de segurança para valores altos)
         if value > rule.target_max:
             candidates.append((value / 10.0, "fix_10x_scale"))
             candidates.append((value / 100.0, "fix_100x_scale"))

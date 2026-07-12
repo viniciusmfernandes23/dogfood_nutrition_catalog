@@ -82,8 +82,8 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
 
     "calcium_min_mgkg": NormalizationRule(
         field="calcium_min_mgkg",
-        target_min=1500,
-        target_max=50000,
+        target_min=1000, # Reduzido para aceitar dietas específicas
+        target_max=60000, # Aumentado para petiscos
         overscale_factor=10,
         decimal_shift_factor=100, # Trata 15.0 -> 1500
         percent_factor=PERCENT_TO_MGKG_FACTOR,
@@ -92,8 +92,8 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
 
     "calcium_max_mgkg": NormalizationRule(
         field="calcium_max_mgkg",
-        target_min=1500,
-        target_max=50000,
+        target_min=1000,
+        target_max=60000,
         overscale_factor=10,
         decimal_shift_factor=100,
         percent_factor=PERCENT_TO_MGKG_FACTOR,
@@ -102,8 +102,8 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
 
     "phosphorus_mgkg": NormalizationRule(
         field="phosphorus_mgkg",
-        target_min=1000,
-        target_max=30000,
+        target_min=500, # Reduzido para dietas de baixo fósforo (renal)
+        target_max=40000,
         overscale_factor=10,
         decimal_shift_factor=100, # Trata 10.0 -> 1000
         percent_factor=PERCENT_TO_MGKG_FACTOR,
@@ -187,6 +187,12 @@ RULE_PRIORITY = [
 
     "gkg_to_mgkg",
 
+    "unit_direct_percent_to_gkg",
+    "unit_direct_percent_to_mgkg",
+    "unit_direct_gkg_to_mgkg",
+    "unit_direct_already_gkg",
+    "unit_direct_already_mgkg",
+
 ]
 
 
@@ -205,6 +211,12 @@ RULE_CONFIDENCE = {
     "percent_conversion": 0.95,
 
     "gkg_to_mgkg": 0.90,
+
+    "unit_direct_percent_to_gkg": 1.0,
+    "unit_direct_percent_to_mgkg": 1.0,
+    "unit_direct_gkg_to_mgkg": 1.0,
+    "unit_direct_already_gkg": 1.0,
+    "unit_direct_already_mgkg": 1.0,
 
     "ambiguous": 0.40,
 

@@ -23,12 +23,11 @@ NUTRIENT_ALIASES = {
 
     ],
 
-    "fiber": [
-
+        "fiber": [
         "fibra bruta",
         "fibra alimentar",
+        "fibra",
         "fb",
-
     ],
 
     "ash": [
@@ -46,23 +45,25 @@ NUTRIENT_ALIASES = {
 
     ],
 
-    "calcium_min": [
-
+        "calcium_min": [
         "cálcio mín",
         "calcio mín",
         "calcio min",
         "cálcio mínimo",
         "calcio minimo",
-
+        "cálcio (mín)",
+        "calcio (min)",
+        "cálcio",
+        "calcio",
     ],
 
     "calcium_max": [
-
         "cálcio máx",
         "calcio max",
         "calcio máximo",
         "calcio maximo",
-
+        "cálcio (máx)",
+        "calcio (max)",
     ],
 
     "phosphorus": [
