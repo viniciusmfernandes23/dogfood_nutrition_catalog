@@ -27,7 +27,12 @@ NUTRIENT_ALIASES = {
         "fibra bruta",
         "fibra alimentar",
         "fibra",
+        "fibras",
+        "matéria fibrosa",
+        "materia fibrosa",
         "fb",
+        "extrato fibroso",
+        "material fibroso",
     ],
 
     "ash": [
@@ -45,32 +50,34 @@ NUTRIENT_ALIASES = {
 
     ],
 
-        "calcium_min": [
-        "cálcio mín",
-        "calcio mín",
-        "calcio min",
-        "cálcio mínimo",
-        "calcio minimo",
-        "cálcio (mín)",
-        "calcio (min)",
-        "cálcio",
-        "calcio",
+        "calcium_max": [
+        r"cálcio \(máx\.?\)",
+        r"calcio \(max\.?\)",
+        r"cálcio máx\.?",
+        r"calcio max\.?",
+        "cálcio máximo",
+        "calcio maximo",
     ],
 
-    "calcium_max": [
-        "cálcio máx",
-        "calcio max",
-        "calcio máximo",
-        "calcio maximo",
-        "cálcio (máx)",
-        "calcio (max)",
+    "calcium_min": [
+        r"cálcio \(mín\.?\)",
+        r"calcio \(min\.?\)",
+        r"cálcio mín\.?",
+        r"calcio min\.?",
+        "cálcio mínimo",
+        "calcio minimo",
+        r"cálcio(?!\s*\(?máx)",
+        r"calcio(?!\s*\(?max)",
     ],
 
     "phosphorus": [
-
+        r"fósforo \(mín\.?\)",
+        r"fosforo \(min\.?\)",
+        r"fósforo mín\.?",
+        r"fosforo min\.?",
         "fósforo",
         "fosforo",
-
+        "p",
     ],
 
     "sodium": [

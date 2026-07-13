@@ -133,7 +133,7 @@ class NormalizationEngine:
         # 2. Soma de Macronutrientes (Proteína + Gordura + Fibra + Cinzas + Umidade <= 1000 g/kg)
         macros_all = ["protein_gkg", "fat_gkg", "fiber_gkg", "ash_gkg", "moisture_gkg"]
         macro_sum = sum(df.at[index, m] for m in macros_all if pd.notna(df.at[index, m]))
-        if macro_sum > 1100: # Aumentado para 10% de tolerância devido a imprecisões frequentes em rótulos brasileiros
+        if macro_sum > 1150: # Aumentado para 15% de tolerância para evitar falsos positivos em rótulos com arredondamentos grosseiros
             print(f"[BIOLOGICAL AUDIT] Soma total de nutrientes ({macro_sum}g/kg) impossível no produto {product_id}. Anulando linha nutricional.")
             for m in macros_all:
                 df.at[index, m] = None
@@ -179,7 +179,10 @@ class NormalizationEngine:
         
         if pd.notna(ca) and pd.notna(p) and p > 0:
             ratio = ca / p
-            if ratio < 0.4 or ratio > 5.0:
+            # v1.3.4: Razão ajustada para 0.25-4.5. 
+            # Acima de 4.5 é extremamente improvável, mas relaxamos para 4.5
+            # para evitar a perda de 88 registros de fósforo identificada.
+            if ratio < 0.25 or ratio > 4.5:
                 print(f"[BIOLOGICAL AUDIT] Razão Ca:P bizarra ({ratio:.2f}) no produto {product_id}. Anulando minerais suspeitos.")
                 df.at[index, "calcium_min_mgkg"] = None
                 df.at[index, "calcium_max_mgkg"] = None

@@ -148,12 +148,16 @@ def run_extraction():
             
             for index, row in full_df.iterrows():
                 nutrients = parse_nutrition(row['raw_guarantee'])
-                for nut_key, nut_data in nutrients.items():
-                    target_col = nutrient_mapping.get(nut_key)
+                for _, nut_data in nutrients.items():
+                    nut_type = nut_data['nutrient']
+                    target_col = nutrient_mapping.get(nut_type)
                     if target_col:
                         val_real = nut_data['value']
+                        # Se já houver um valor na coluna (ex: calcium_min preenchido por 'cálcio')
+                        # e o novo match for mais específico (ex: 'cálcio mín'), poderíamos priorizar,
+                        # mas aqui simplesmente preenchemos o que for encontrado.
                         full_df.at[index, target_col] = val_real
-                        full_df.at[index, f"{nut_key}_unit"] = nut_data['unit']
+                        full_df.at[index, f"{nut_type}_unit"] = nut_data['unit']
         else:
             print("Pulando extração nutricional (Modo PRICE).")
             if 'raw_guarantee' not in full_df.columns:
