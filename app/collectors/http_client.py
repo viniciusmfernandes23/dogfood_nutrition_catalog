@@ -5,6 +5,7 @@ import time
 import httpx
 
 from app.core.config import settings
+from app.core.logging import logger
 
 
 class HttpClient:
@@ -38,23 +39,30 @@ class HttpClient:
     ) -> httpx.Response:
 
         for attempt in range(settings.retries):
-
             try:
-
                 response = self.client.get(url)
-
                 response.raise_for_status()
-
                 return response
-
-            except httpx.HTTPError:
-
+            except httpx.HTTPStatusError as e:
+                # Se for erro de cliente (4xx), não adianta tentar de novo na maioria das vezes
+                if 400 <= e.response.status_code < 500:
+                    logger.error(f"Erro de Cliente {e.response.status_code} para URL: {url}")
+                    raise
+                
+                logger.warning(f"Tentativa {attempt + 1}/{settings.retries} falhou com status {e.response.status_code}. Retentando...")
                 if attempt == settings.retries - 1:
                     raise
-
-                time.sleep(
-                    2**attempt
-                )
+                
+                # Backoff exponencial com jitter
+                wait_time = (2 ** attempt) + (time.time() % 1)
+                time.sleep(wait_time)
+            except httpx.HTTPError as e:
+                logger.warning(f"Tentativa {attempt + 1}/{settings.retries} falhou com erro de rede: {e}. Retentando...")
+                if attempt == settings.retries - 1:
+                    raise
+                
+                wait_time = (2 ** attempt) + (time.time() % 1)
+                time.sleep(wait_time)
 
         raise RuntimeError(
             "Falha inesperada."

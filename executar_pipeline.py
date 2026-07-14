@@ -70,22 +70,15 @@ def run_extraction():
         try:
             raw_products = collector.fetch_all()
         except Exception as e:
-            print(f"AVISO: Falha na API ({e}). Usando dados simulados.")
-            raw_products = []
+            print(f"\nERRO NA API COBASI: {e}")
+            print("Não foi possível coletar os produtos reais. Interrompendo para evitar dados corrompidos.")
+            # Em vez de injetar dados simulados silenciosamente, agora lançamos o erro
+            # para que o usuário saiba que a extração falhou.
+            raise RuntimeError(f"Falha crítica na extração da API: {e}")
 
         if not raw_products:
-            product_list = [
-                {
-                    'product_id': '123',
-                    'product_name': 'Ração Teste',
-                    'brand': 'Marca Teste',
-                    'url': 'http://teste.com',
-                    'category_id': '1',
-                    'price': 100.50,
-                    'available': True,
-                    'raw_guarantee': 'Proteína 26%, Sódio 2g/kg'
-                }
-            ]
+            print("AVISO: Nenhum produto retornado pela API. Verifique os filtros ou status do serviço.")
+            product_list = []
         else:
             product_list = []
             for p in raw_products:

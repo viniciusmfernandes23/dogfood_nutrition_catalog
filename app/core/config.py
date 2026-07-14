@@ -6,7 +6,7 @@ class PipelineConfig:
 
     timeout: int = 60
 
-    retries: int = 3
+    retries: int = 5
 
     page_size: int = 50
 
