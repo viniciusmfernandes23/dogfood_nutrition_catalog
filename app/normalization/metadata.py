@@ -17,22 +17,22 @@ class NutrientMetadata:
 
 # Dicionário mestre de metadados orientado por nutriente
 NUTRIENT_METADATA: Dict[str, NutrientMetadata] = {
-    # Macronutrientes (Interno: g/kg * 10 -> Saída: g/kg)
-    "moisture_gkg": NutrientMetadata("moisture_gkg", "Umidade", "g/kg", 0.1),
-    "protein_gkg": NutrientMetadata("protein_gkg", "Proteína", "g/kg", 0.1),
-    "fat_gkg": NutrientMetadata("fat_gkg", "Gordura", "g/kg", 0.1),
-    "fiber_gkg": NutrientMetadata("fiber_gkg", "Fibra", "g/kg", 0.1),
-    "ash_gkg": NutrientMetadata("ash_gkg", "Cinzas", "g/kg", 0.1),
+    # Macronutrientes (Interno: g/kg -> Saída: g/kg)
+    "moisture_gkg": NutrientMetadata("moisture_gkg", "Umidade", "g/kg", 1.0),
+    "protein_gkg": NutrientMetadata("protein_gkg", "Proteína", "g/kg", 1.0),
+    "fat_gkg": NutrientMetadata("fat_gkg", "Gordura", "g/kg", 1.0),
+    "fiber_gkg": NutrientMetadata("fiber_gkg", "Fibra", "g/kg", 1.0),
+    "ash_gkg": NutrientMetadata("ash_gkg", "Cinzas", "g/kg", 1.0),
     
-    # Energia (Interno: kcal/kg * 10 -> Saída: kcal/kg)
-    "metabolizable_energy_kcalkg": NutrientMetadata("metabolizable_energy_kcalkg", "Energia Metabolizável", "kcal/kg", 0.1),
+    # Energia (Interno: kcal/kg -> Saída: kcal/kg)
+    "metabolizable_energy_kcalkg": NutrientMetadata("metabolizable_energy_kcalkg", "Energia Metabolizável", "kcal/kg", 1.0),
     
-    # Minerais (Interno: mg/kg * 10 -> Saída: mg/kg)
-    "calcium_min_mgkg": NutrientMetadata("calcium_min_mgkg", "Cálcio (Mín)", "mg/kg", 0.1),
-    "calcium_max_mgkg": NutrientMetadata("calcium_max_mgkg", "Cálcio (Máx)", "mg/kg", 0.1),
-    "phosphorus_mgkg": NutrientMetadata("phosphorus_mgkg", "Fósforo", "mg/kg", 0.1),
-    "sodium_mgkg": NutrientMetadata("sodium_mgkg", "Sódio", "mg/kg", 0.1),
-    "potassium_mgkg": NutrientMetadata("potassium_mgkg", "Potássio", "mg/kg", 0.1),
+    # Minerais (Interno: mg/kg -> Saída: mg/kg)
+    "calcium_min_mgkg": NutrientMetadata("calcium_min_mgkg", "Cálcio (Mín)", "mg/kg", 1.0),
+    "calcium_max_mgkg": NutrientMetadata("calcium_max_mgkg", "Cálcio (Máx)", "mg/kg", 1.0),
+    "phosphorus_mgkg": NutrientMetadata("phosphorus_mgkg", "Fósforo", "mg/kg", 1.0),
+    "sodium_mgkg": NutrientMetadata("sodium_mgkg", "Sódio", "mg/kg", 1.0),
+    "potassium_mgkg": NutrientMetadata("potassium_mgkg", "Potássio", "mg/kg", 1.0),
 }
 
 

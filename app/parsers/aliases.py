@@ -9,6 +9,8 @@ NUTRIENT_ALIASES = {
         "pb",
         "proteína mínima",
         "proteina minima",
+        r"proteína bruta \(mín\.?\)",
+        r"proteina bruta \(min\.?\)",
 
     ],
 
@@ -20,6 +22,8 @@ NUTRIENT_ALIASES = {
         "gordura",
         "lipídios",
         "lipidios",
+        r"extrato etéreo \(mín\.?\)",
+        r"extrato etereo \(min\.?\)",
 
     ],
 
@@ -41,12 +45,16 @@ NUTRIENT_ALIASES = {
         "materia mineral",
         "cinzas",
         "mm",
+        r"matéria mineral \(máx\.?\)",
+        r"materia mineral \(max\.?\)",
 
     ],
 
     "moisture": [
 
         "umidade",
+        r"umidade \(máx\.?\)",
+        r"umidade \(max\.?\)",
 
     ],
 
@@ -57,6 +65,8 @@ NUTRIENT_ALIASES = {
         r"calcio max\.?",
         "cálcio máximo",
         "calcio maximo",
+        r"cálcio\s*,\s*máx",
+        r"calcio\s*,\s*max",
     ],
 
     "calcium_min": [
@@ -66,6 +76,8 @@ NUTRIENT_ALIASES = {
         r"calcio min\.?",
         "cálcio mínimo",
         "calcio minimo",
+        r"cálcio\s*,\s*mín",
+        r"calcio\s*,\s*min",
         r"cálcio(?!\s*\(?máx)",
         r"calcio(?!\s*\(?max)",
     ],
@@ -77,6 +89,8 @@ NUTRIENT_ALIASES = {
         r"fosforo min\.?",
         "fósforo",
         "fosforo",
+        r"fósforo\s*,\s*mín",
+        r"fosforo\s*,\s*min",
         "p",
     ],
 
@@ -84,6 +98,8 @@ NUTRIENT_ALIASES = {
 
         "sódio",
         "sodio",
+        r"sódio \(mín\.?\)",
+        r"sodio \(min\.?\)",
 
     ],
 
@@ -91,6 +107,8 @@ NUTRIENT_ALIASES = {
 
         "potássio",
         "potassio",
+        r"potássio \(mín\.?\)",
+        r"potassio \(min\.?\)",
 
     ],
 

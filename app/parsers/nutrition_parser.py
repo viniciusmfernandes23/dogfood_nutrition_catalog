@@ -63,6 +63,8 @@ def parse_value(
                 unit = "mg/kg"
             elif unit in ["kcal/kg", "kcal / kg", "kcal.kg", "kcal", "cal/kg", "cal"]:
                 unit = "kcal/kg"
+            elif unit in ["kcal/sachê", "kcal/sache"]:
+                unit = "kcal/sache"
 
             return (
                 value,
@@ -140,6 +142,8 @@ def parse_nutrition(
                         unit = "mg/kg"
                     elif unit in ["kcal/kg", "kcal / kg", "kcal.kg", "kcal", "cal/kg", "cal"]:
                         unit = "kcal/kg"
+                    elif unit in ["kcal/sachê", "kcal/sache"]:
+                        unit = "kcal/sache"
 
                     all_matches.append({
                         "nutrient": nutrient,

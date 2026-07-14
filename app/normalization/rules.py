@@ -82,22 +82,24 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
 
     "calcium_min_mgkg": NormalizationRule(
         field="calcium_min_mgkg",
-        target_min=1000, # Reduzido para aceitar dietas específicas
-        target_max=60000, # Aumentado para petiscos
-        overscale_factor=10,
-        decimal_shift_factor=100, # Trata 15.0 -> 1500
-        percent_factor=PERCENT_TO_MGKG_FACTOR,
-        gkg_to_mgkg=True,
-    ),
-
-    "calcium_max_mgkg": NormalizationRule(
-        field="calcium_max_mgkg",
-        target_min=1000,
+        target_min=100, # Reduzido para 0.01% (ID 31133667)
         target_max=60000,
         overscale_factor=10,
         decimal_shift_factor=100,
         percent_factor=PERCENT_TO_MGKG_FACTOR,
         gkg_to_mgkg=True,
+        decimal_shift_up=1000, # Trata 0.8 -> 800 mg/kg
+    ),
+
+    "calcium_max_mgkg": NormalizationRule(
+        field="calcium_max_mgkg",
+        target_min=100,
+        target_max=60000,
+        overscale_factor=10,
+        decimal_shift_factor=100,
+        percent_factor=PERCENT_TO_MGKG_FACTOR,
+        gkg_to_mgkg=True,
+        decimal_shift_up=1000,
     ),
 
     "phosphorus_mgkg": NormalizationRule(

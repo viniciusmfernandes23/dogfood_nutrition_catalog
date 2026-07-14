@@ -141,16 +141,41 @@ def run_extraction():
             
             for index, row in full_df.iterrows():
                 nutrients = parse_nutrition(row['raw_guarantee'])
+                # Dicionário para rastrear o melhor match para cada nutriente canônico
+                best_matches = {}
+                
                 for _, nut_data in nutrients.items():
                     nut_type = nut_data['nutrient']
                     target_col = nutrient_mapping.get(nut_type)
-                    if target_col:
-                        val_real = nut_data['value']
-                        # Se já houver um valor na coluna (ex: calcium_min preenchido por 'cálcio')
-                        # e o novo match for mais específico (ex: 'cálcio mín'), poderíamos priorizar,
-                        # mas aqui simplesmente preenchemos o que for encontrado.
-                        full_df.at[index, target_col] = val_real
-                        full_df.at[index, f"{nut_type}_unit"] = nut_data['unit']
+                    if not target_col:
+                        continue
+                    
+                    # Ignora unidades que não são por kg para evitar agregação errada
+                    # Ex: Energia por sachê não deve ser usada como energia por kg
+                    if nut_data['unit'] == 'kcal/sache' and nut_type == 'metabolizable_energy':
+                        continue
+                        
+                    val_real = nut_data['value']
+                    alias = nut_data['matched_alias'].lower()
+                    
+                    # Heurística de prioridade: aliases com 'mín' ou 'máx' são mais específicos
+                    # do que aliases genéricos.
+                    priority = 1
+                    if 'mín' in alias or 'min' in alias or 'máx' in alias or 'max' in alias:
+                        priority = 2
+                    
+                    if nut_type not in best_matches or priority > best_matches[nut_type]['priority']:
+                        best_matches[nut_type] = {
+                            'value': val_real,
+                            'unit': nut_data['unit'],
+                            'priority': priority
+                        }
+                
+                # Aplica os melhores matches encontrados no DataFrame
+                for nut_type, data in best_matches.items():
+                    target_col = nutrient_mapping.get(nut_type)
+                    full_df.at[index, target_col] = data['value']
+                    full_df.at[index, f"{nut_type}_unit"] = data['unit']
         else:
             print("Pulando extração nutricional (Modo PRICE).")
             if 'raw_guarantee' not in full_df.columns:
