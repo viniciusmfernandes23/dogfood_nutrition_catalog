@@ -239,14 +239,14 @@ class WarehouseExporter:
         # Energia não pode exceder 9000 kcal/kg (limite da gordura pura) e nem ser inferior a 100 kcal/kg
         mask_energy_extreme = (df["nutrient_name"] == "metabolizable_energy_kcalkg") & ((df["nutrient_value"] > 9000) | (df["nutrient_value"] < 100))
         
-        # Minerais não podem exceder 60.000 mg/kg (6%)
+        # Minerais não podem exceder 60.000 mg/kg (6%) ou serem insignificantes (< 10mg/kg para essenciais)
         mineral_fields = ["sodium_mgkg", "potassium_mgkg", "calcium_min_mgkg", "calcium_max_mgkg", "phosphorus_mgkg"]
-        mask_mineral_extreme = (df["nutrient_name"].isin(mineral_fields)) & (df["nutrient_value"] > 60000)
+        mask_mineral_extreme = (df["nutrient_name"].isin(mineral_fields)) & ((df["nutrient_value"] > 60000) | (df["nutrient_value"] < 10))
 
         # Aplica anulações
         total_extreme = mask_macro_extreme.sum() + mask_energy_extreme.sum() + mask_mineral_extreme.sum()
         if total_extreme > 0:
-            print(f"[FINAL SANITY BARRIER] Anulando {total_extreme} valores fisicamente impossíveis.")
+            print(f"[FINAL SANITY BARRIER] Anulando {total_extreme} valores fisicamente impossíveis ou insignificantes.")
             df.loc[mask_macro_extreme | mask_energy_extreme | mask_mineral_extreme, "nutrient_value"] = None
 
         # 2. Âncora de Umidade vs Energia (Rações Úmidas)
@@ -272,17 +272,41 @@ class WarehouseExporter:
                         else:
                             df.loc[prod_mask & (df["nutrient_name"] == "metabolizable_energy_kcalkg"), "nutrient_value"] = round(energy / 10.0, 2)
 
-        # 3. Validação de Soma de Macronutrientes por Produto
+        # 3. Validação de Soma de Macronutrientes e Relações por Produto
         for product_id in df["product_id"].unique():
             prod_mask = df["product_id"] == product_id
-            macros_present = df[prod_mask & (df["nutrient_name"].isin(macro_fields))]
             
+            # Validação de Macronutrientes
+            macros_present = df[prod_mask & (df["nutrient_name"].isin(macro_fields))]
             if not macros_present.empty:
                 total_sum = macros_present["nutrient_value"].sum()
-                if total_sum > 1050: # Tolerância de 5%
-                    print(f"[FINAL SANITY BARRIER] Soma de macros impossível ({total_sum}g/kg) no produto {product_id}. Anulando nutrientes.")
+                
+                # Proteção contra macros insignificantes (ex: 0.06 g/kg gordura)
+                protein_val = df.loc[prod_mask & (df["nutrient_name"] == "protein_gkg"), "nutrient_value"]
+                fat_val = df.loc[prod_mask & (df["nutrient_name"] == "fat_gkg"), "nutrient_value"]
+                
+                is_insignificant = False
+                if not protein_val.empty and protein_val.values[0] < 5: is_insignificant = True
+                if not fat_val.empty and fat_val.values[0] < 1: is_insignificant = True
+                
+                if total_sum > 1050 or is_insignificant:
+                    print(f"[FINAL SANITY BARRIER] Macros inconsistentes no produto {product_id}. Anulando.")
                     df.loc[prod_mask & (df["nutrient_name"].isin(macro_fields)), "nutrient_value"] = None
                     df.loc[prod_mask & (df["nutrient_name"] == "metabolizable_energy_kcalkg"), "nutrient_value"] = None
+            
+            # Validação de Relação Ca:P
+            ca_min = df.loc[prod_mask & (df["nutrient_name"] == "calcium_min_mgkg"), "nutrient_value"]
+            ca_max = df.loc[prod_mask & (df["nutrient_name"] == "calcium_max_mgkg"), "nutrient_value"]
+            p_val = df.loc[prod_mask & (df["nutrient_name"] == "phosphorus_mgkg"), "nutrient_value"]
+            
+            ca = ca_min.values[0] if not ca_min.empty else (ca_max.values[0] if not ca_max.empty else None)
+            p = p_val.values[0] if not p_val.empty else None
+            
+            if pd.notna(ca) and pd.notna(p) and p > 0:
+                ratio = ca / p
+                if ratio < 0.9 or ratio > 4.5:
+                    print(f"[FINAL SANITY BARRIER] Razão Ca:P bizarra ({ratio:.2f}) no produto {product_id}. Anulando minerais.")
+                    df.loc[prod_mask & (df["nutrient_name"].isin(["calcium_min_mgkg", "calcium_max_mgkg", "phosphorus_mgkg"])), "nutrient_value"] = None
 
     # ==========================================================
     # Helpers

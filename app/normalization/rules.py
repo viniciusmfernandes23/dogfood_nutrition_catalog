@@ -108,6 +108,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         decimal_shift_factor=100, # Trata 10.0 -> 1000
         percent_factor=PERCENT_TO_MGKG_FACTOR,
         gkg_to_mgkg=True,
+        decimal_shift_up=1000, # Trata 0.8 -> 800 mg/kg
     ),
 
     "sodium_mgkg": NormalizationRule(
@@ -118,6 +119,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         decimal_shift_factor=100,
         percent_factor=PERCENT_TO_MGKG_FACTOR,
         gkg_to_mgkg=True,
+        decimal_shift_up=1000,
     ),
 
     "potassium_mgkg": NormalizationRule(
@@ -128,6 +130,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         decimal_shift_factor=100,
         percent_factor=PERCENT_TO_MGKG_FACTOR,
         gkg_to_mgkg=True,
+        decimal_shift_up=1000,
     ),
 
     "metabolizable_energy_kcalkg": NormalizationRule(
@@ -136,6 +139,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         target_max=6500, # Aumentado levemente para petiscos hipercalóricos
         overscale_factor=10, # Trata 35000 -> 3500
         decimal_shift_factor=1000, # Trata 3.5 -> 3500
+        percent_factor=10000,      # Trata 0.35 -> 3500 (100g -> kg)
     ),
 
 }

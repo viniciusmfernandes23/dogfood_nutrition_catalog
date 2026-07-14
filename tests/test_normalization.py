@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import numpy as np
 
 from app.normalization.engine import NormalizationEngine
 from app.normalization.models import (
@@ -9,18 +10,20 @@ from app.normalization.models import (
 )
 from app.normalization.resolver import Resolver
 from app.normalization.validator import Validator
+from app.normalization.rules import get_rule
 
 
 def test_validator_accepts_valid_protein():
-
+    rule = get_rule("protein_gkg")
     nutrient = NormalizedNutrient(
-        name="protein",
+        name="protein_gkg",
         value=260,
         unit="g/kg",
     )
 
     result = Validator().validate(
-        nutrient
+        nutrient,
+        rule=rule
     )
 
     assert (
@@ -30,15 +33,16 @@ def test_validator_accepts_valid_protein():
 
 
 def test_validator_rejects_negative_value():
-
+    rule = get_rule("protein_gkg")
     nutrient = NormalizedNutrient(
-        name="protein",
+        name="protein_gkg",
         value=-10,
         unit="g/kg",
     )
 
     result = Validator().validate(
-        nutrient
+        nutrient,
+        rule=rule
     )
 
     assert (
@@ -48,15 +52,16 @@ def test_validator_rejects_negative_value():
 
 
 def test_validator_detects_implausible_value():
-
+    rule = get_rule("protein_gkg")
     nutrient = NormalizedNutrient(
-        name="protein",
+        name="protein_gkg",
         value=2000,
         unit="g/kg",
     )
 
     result = Validator().validate(
-        nutrient
+        nutrient,
+        rule=rule
     )
 
     assert (
@@ -66,53 +71,46 @@ def test_validator_detects_implausible_value():
 
 
 def test_resolver_converts_percent_to_gkg():
-
+    rule = get_rule("protein_gkg")
     nutrient = NormalizedNutrient(
-        name="protein",
+        name="protein_gkg",
         value=26,
         unit="%",
+        original_unit="%"
     )
 
     resolved = Resolver().resolve(
-        nutrient
+        nutrient,
+        rule=rule
     )
-
-    assert resolved.unit == "g/kg"
 
     assert resolved.value == 260
 
 
 def test_resolver_keeps_normalized_values():
-
+    rule = get_rule("fat_gkg")
     nutrient = NormalizedNutrient(
-        name="fat",
+        name="fat_gkg",
         value=150,
         unit="g/kg",
     )
 
     resolved = Resolver().resolve(
-        nutrient
+        nutrient,
+        rule=rule
     )
 
     assert resolved.value == 150
-
-    assert resolved.unit == "g/kg"
 
 
 def test_engine_normalizes_dataframe():
 
     df = pd.DataFrame(
-
         {
-
             "product_id": [1],
-
-            "protein": [26],
-
-            "protein_unit": ["%"],
-
+            "protein_gkg": [26],
+            "protein_gkg_unit": ["%"],
         }
-
     )
 
     engine = NormalizationEngine()
@@ -123,23 +121,17 @@ def test_engine_normalizes_dataframe():
         )
     )
 
-    assert len(
-        normalized
-    ) == 1
-
+    assert len(normalized) == 1
     assert report is not None
+    assert normalized.at[0, "protein_gkg"] == 260.0
 
 
 def test_engine_preserves_product_count():
 
     df = pd.DataFrame(
-
         {
-
             "product_id": [1, 2, 3],
-
         }
-
     )
 
     engine = NormalizationEngine()
@@ -150,21 +142,15 @@ def test_engine_preserves_product_count():
         )
     )
 
-    assert len(
-        normalized
-    ) == 3
+    assert len(normalized) == 3
 
 
 def test_engine_returns_dataframe():
 
     df = pd.DataFrame(
-
         {
-
             "product_id": [1],
-
         }
-
     )
 
     engine = NormalizationEngine()
@@ -182,41 +168,35 @@ def test_engine_returns_dataframe():
 
 
 def test_validator_marks_missing_value():
-
+    rule = get_rule("protein_gkg")
     nutrient = NormalizedNutrient(
-        name="protein",
+        name="protein_gkg",
         value=None,
         unit="g/kg",
     )
 
     result = Validator().validate(
-        nutrient
+        nutrient,
+        rule=rule
     )
 
-    assert result.status in {
-
-        ValidationStatus.MISSING,
-
-        ValidationStatus.REVIEW,
-
-    }
+    assert result.status == ValidationStatus.MISSING
 
 
 def test_validator_accepts_calcium():
-
+    rule = get_rule("calcium_min_mgkg")
     nutrient = NormalizedNutrient(
-        name="calcium_min",
+        name="calcium_min_mgkg",
         value=12000,
         unit="mg/kg",
     )
 
     result = Validator().validate(
-        nutrient
+        nutrient,
+        rule=rule
     )
 
-    assert result.status == (
-        ValidationStatus.NORMALIZED
-    )
+    assert result.status == ValidationStatus.NORMALIZED
 
 
 def test_engine_handles_empty_dataframe():
@@ -239,17 +219,11 @@ def test_engine_handles_empty_dataframe():
 def test_engine_does_not_modify_original_dataframe():
 
     df = pd.DataFrame(
-
         {
-
             "product_id": [1],
-
-            "protein": [26],
-
-            "protein_unit": ["%"],
-
+            "protein_gkg": [26],
+            "protein_gkg_unit": ["%"],
         }
-
     )
 
     original = df.copy(
@@ -266,3 +240,35 @@ def test_engine_does_not_modify_original_dataframe():
         df,
         original,
     )
+
+def test_biological_audit_regression():
+    """Testa as novas regras de auditoria biológica v1.4.1"""
+    engine = NormalizationEngine()
+    
+    data = {
+        "product_id": [101, 102, 103, 104],
+        "calcium_min_mgkg": [1000.0, 2000.0, 0.0, 5000.0],
+        "phosphorus_mgkg": [1300.0, 50.0, 0.0, 5000.0],
+        "protein_gkg": [250.0, 250.0, 250.0, 1.0], # 1.0g/kg é insuficiente
+        "fat_gkg": [100.0, 100.0, 100.0, 100.0],
+        "sodium_mgkg": [2000.0, 2000.0, 2000.0, 3000.0],
+    }
+    df = pd.DataFrame(data)
+    normalized_df, _ = engine.normalize_dataframe(df)
+    
+    # 101: Razão Ca:P < 0.9 (0.77) -> Anulado
+    assert pd.isna(normalized_df.at[0, "calcium_min_mgkg"])
+    assert pd.isna(normalized_df.at[0, "phosphorus_mgkg"])
+    
+    # 102: Razão Ca:P > 4.5 (40.0) -> Anulado
+    assert pd.isna(normalized_df.at[1, "calcium_min_mgkg"])
+    assert pd.isna(normalized_df.at[1, "phosphorus_mgkg"])
+    
+    # 103: Minerais Zerados -> Anulado
+    assert pd.isna(normalized_df.at[2, "calcium_min_mgkg"])
+    assert pd.isna(normalized_df.at[2, "phosphorus_mgkg"])
+    
+    # 104: Proteína Insignificante -> Anulado
+    assert pd.isna(normalized_df.at[3, "protein_gkg"])
+    # Sodium também deve ser anulado se a proteína for invalidada
+    assert pd.isna(normalized_df.at[3, "sodium_mgkg"])

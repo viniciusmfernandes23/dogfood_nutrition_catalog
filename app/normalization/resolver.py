@@ -29,9 +29,7 @@ class Resolver:
         nutrient: NormalizedNutrient,
         rule: NormalizationRule | None = None,
     ) -> NormalizedNutrient:
-        # Log de Auditoria para depuração do usuário
-        if nutrient.name == "sodium_mgkg" and nutrient.value is not None and (nutrient.value > 100000 or nutrient.value < 1):
-             print(f"[AUDIT] Resolvendo {nutrient.name}: valor_entrada={nutrient.value}, unidade={nutrient.original_unit}")
+
 
         if nutrient.value is None:
             nutrient.status = ValidationStatus.MISSING
@@ -220,8 +218,12 @@ class Resolver:
         # Útil para casos como Cálcio 1.5 -> 1500 mg/kg
         if rule.decimal_shift_factor:
             candidates.append((value * rule.decimal_shift_factor, "decimal_shift"))
+        
+        # 5. Decimal Shift Up (Multiplicação agressiva para valores muito baixos)
+        if rule.decimal_shift_up:
+            candidates.append((value * rule.decimal_shift_up, "decimal_shift_up"))
 
-        # 5. Deslocamento Decimal descendente (Heurística de segurança para valores altos)
+        # 6. Deslocamento Decimal descendente (Heurística de segurança para valores altos)
         if value > rule.target_max:
             candidates.append((value / 10.0, "fix_10x_scale"))
             candidates.append((value / 100.0, "fix_100x_scale"))

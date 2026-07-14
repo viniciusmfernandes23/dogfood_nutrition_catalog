@@ -31,6 +31,8 @@ class NormalizationRule:
 
     decimal_shift_factor: float | None = None
 
+    decimal_shift_up: float | None = None
+
     gkg_to_mgkg: bool = False
 
 

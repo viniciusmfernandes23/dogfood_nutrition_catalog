@@ -122,6 +122,8 @@ class NormalizationEngine:
         for col in required_cols:
             if col not in df.columns:
                 df[col] = None
+        
+        minerals_mgkg = ["sodium_mgkg", "potassium_mgkg", "calcium_min_mgkg", "calcium_max_mgkg", "phosphorus_mgkg"]
 
         # 1. Inversão Mínimo vs Máximo (Cálcio)
         ca_min = df.at[index, "calcium_min_mgkg"]
@@ -133,6 +135,19 @@ class NormalizationEngine:
         # 2. Soma de Macronutrientes (Proteína + Gordura + Fibra + Cinzas + Umidade <= 1000 g/kg)
         macros_all = ["protein_gkg", "fat_gkg", "fiber_gkg", "ash_gkg", "moisture_gkg"]
         macro_sum = sum(df.at[index, m] for m in macros_all if pd.notna(df.at[index, m]))
+        
+        # v1.4.1: Proteção contra valores zerados em macronutrientes essenciais (se umidade/proteína forem quase zero)
+        protein = df.at[index, "protein_gkg"]
+        fat = df.at[index, "fat_gkg"]
+        if (pd.notna(protein) and protein < 5) or (pd.notna(fat) and fat < 1):
+             print(f"[BIOLOGICAL AUDIT] Macronutrientes insignificantes no produto {product_id}. Anulando linha nutricional.")
+             for m in macros_all:
+                 df.at[index, m] = None
+             for m in minerals_mgkg:
+                 df.at[index, m] = None
+             df.at[index, "metabolizable_energy_kcalkg"] = None
+             return
+
         if macro_sum > 1150: # Aumentado para 15% de tolerância para evitar falsos positivos em rótulos com arredondamentos grosseiros
             print(f"[BIOLOGICAL AUDIT] Soma total de nutrientes ({macro_sum}g/kg) impossível no produto {product_id}. Anulando linha nutricional.")
             for m in macros_all:
@@ -164,7 +179,6 @@ class NormalizationEngine:
 
         # 5. Coerência Cinzas vs Minerais
         ash = df.at[index, "ash_gkg"]
-        minerals_mgkg = ["sodium_mgkg", "potassium_mgkg", "calcium_max_mgkg", "phosphorus_mgkg"]
         minerals_sum_gkg = sum(df.at[index, m] / 1000.0 for m in minerals_mgkg if pd.notna(df.at[index, m]))
         if pd.notna(ash) and minerals_sum_gkg >= ash: # A soma dos minerais não deve exceder o teor de cinzas
             print(f"[BIOLOGICAL AUDIT] Soma de minerais ({minerals_sum_gkg}g/kg) excede cinzas ({ash}g/kg) no produto {product_id}. Anulando minerais suspeitos.")
@@ -177,12 +191,19 @@ class NormalizationEngine:
         ca_max_val = df.at[index, "calcium_max_mgkg"]
         ca = ca_min_val if pd.notna(ca_min_val) else ca_max_val
         
+        # v1.4.1: Proteção contra minerais zerados
+        if (pd.notna(p) and p <= 0) or (pd.notna(ca) and ca <= 0):
+             print(f"[BIOLOGICAL AUDIT] Minerais (Ca/P) zerados no produto {product_id}. Anulando.")
+             df.at[index, "calcium_min_mgkg"] = None
+             df.at[index, "calcium_max_mgkg"] = None
+             df.at[index, "phosphorus_mgkg"] = None
+             p = None # Atualiza para evitar calculo de ratio
+        
         if pd.notna(ca) and pd.notna(p) and p > 0:
             ratio = ca / p
-            # v1.3.4: Razão ajustada para 0.25-4.5. 
-            # Acima de 4.5 é extremamente improvável, mas relaxamos para 4.5
-            # para evitar a perda de 88 registros de fósforo identificada.
-            if ratio < 0.25 or ratio > 4.5:
+            # v1.4.1: Razão mínima biológica é ~1.0 para rações completas. 
+            # Abaixo de 0.9 é sinal de erro de coleta ou produto desbalanceado.
+            if ratio < 0.9 or ratio > 4.5:
                 print(f"[BIOLOGICAL AUDIT] Razão Ca:P bizarra ({ratio:.2f}) no produto {product_id}. Anulando minerais suspeitos.")
                 df.at[index, "calcium_min_mgkg"] = None
                 df.at[index, "calcium_max_mgkg"] = None
@@ -191,9 +212,25 @@ class NormalizationEngine:
         # 7. Trava de Toxicidade para Minerais (Sódio/Potássio)
         for mineral in ["sodium_mgkg", "potassium_mgkg"]:
             val = df.at[index, mineral]
-            if pd.notna(val) and val > 60000: # 6% de mineral é letal/impossível
-                print(f"[BIOLOGICAL AUDIT] Nível tóxico/impossível de {mineral} ({val} mg/kg) no produto {product_id}. Anulando.")
-                df.at[index, mineral] = None
+            if pd.notna(val):
+                if val > 60000: # 6% de mineral é letal/impossível
+                    print(f"[BIOLOGICAL AUDIT] Nível tóxico/impossível de {mineral} ({val} mg/kg) no produto {product_id}. Anulando.")
+                    df.at[index, mineral] = None
+                elif val < 10: # Menos de 10mg/kg é impossível para dieta completa
+                    print(f"[BIOLOGICAL AUDIT] Nível insignificante de {mineral} ({val} mg/kg) no produto {product_id}. Anulando.")
+                    df.at[index, mineral] = None
+        
+        # 8. Densidade de Sódio vs Proteína
+        sodium = df.at[index, "sodium_mgkg"]
+        protein = df.at[index, "protein_gkg"]
+        if pd.notna(sodium) and pd.notna(protein) and protein > 0:
+            # v1.4.1: Se o sódio em mg é > 20% da proteína em g (ratio > 200), 
+            # há um erro de escala ou densidade absurda.
+            # No entanto, se o sódio for 3000 e proteína 115 (11.5%), ratio = 26.
+            # Vamos baixar o limite para 100 para capturar casos como 3000mg sódio / 11.5g proteína = 260
+            if (sodium / protein) > 100: 
+                print(f"[BIOLOGICAL AUDIT] Densidade de Sódio suspeita ({sodium}mg vs {protein}g proteína) no produto {product_id}. Anulando sódio.")
+                df.at[index, "sodium_mgkg"] = None
 
 
     def normalize_dataframe(
