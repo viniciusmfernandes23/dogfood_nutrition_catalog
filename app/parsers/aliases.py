@@ -100,6 +100,8 @@ NUTRIENT_ALIASES = {
         "sodio",
         r"sódio \(mín\.?\)",
         r"sodio \(min\.?\)",
+        r"sódio\s*,\s*mín",
+        r"sodio\s*,\s*min",
 
     ],
 
@@ -109,6 +111,9 @@ NUTRIENT_ALIASES = {
         "potassio",
         r"potássio \(mín\.?\)",
         r"potassio \(min\.?\)",
+        r"potássio\s*,\s*mín",
+        r"potassio\s*,\s*min",
+        "k",
 
     ],
 

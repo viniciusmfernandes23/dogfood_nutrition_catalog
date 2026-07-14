@@ -21,10 +21,14 @@ def parse_value(
     """
 
     for alias in aliases:
+        # v1.3.15: Proteção contra matches parciais (ex: 'p' dando match em 'potássio')
+        # Usamos \b apenas se o alias for curto e alfanumérico para evitar falsos positivos.
+        # Se for um alias longo ou com regex (ex: \(mín\)), confiamos na especificidade do alias.
+        boundary = r"\b" if (len(alias) <= 2 and re.match(r"^\w+$", alias)) else ""
         pattern_str = alias if "\\" in alias else re.escape(alias)
         
         pattern = re.compile(
-            rf"{pattern_str}"
+            rf"{boundary}{pattern_str}{boundary}"
             rf"{SEPARATOR}"
             rf"{NUMBER}"
             rf"\s*"
@@ -99,6 +103,9 @@ def parse_nutrition(
 
     for nutrient, aliases in NUTRIENT_ALIASES.items():
         for alias in aliases:
+            # v1.3.15: Proteção contra matches parciais (ex: 'p' dando match em 'potássio')
+            boundary = r"\b" if (len(alias) <= 2 and re.match(r"^\w+$", alias)) else ""
+            
             # v1.3.13: Se o alias já contém escape de regex (como \(mín\)), usamos como está.
             # Caso contrário, escapamos caracteres especiais.
             if "\\" in alias or "(" in alias or ")" in alias:
@@ -107,7 +114,7 @@ def parse_nutrition(
                 pattern_str = re.escape(alias)
                 
             pattern = re.compile(
-                rf"{pattern_str}"
+                rf"{boundary}{pattern_str}{boundary}"
                 rf"{SEPARATOR}"
                 rf"{NUMBER}"
                 rf"\s*"
