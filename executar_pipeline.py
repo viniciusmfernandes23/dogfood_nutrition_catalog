@@ -210,6 +210,9 @@ def run_extraction():
             for name, path in result.exported_files.items():
                 dest_path = os.path.join(OUTPUT_DIR, os.path.basename(str(path)))
                 
+                # Garante que o diretório de destino existe
+                os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                
                 # Se for a tabela de preços, aplicamos a formatação de moeda
                 if name == "fact_price_snapshot":
                     temp_df = pd.read_csv(path, encoding="utf-8-sig")
