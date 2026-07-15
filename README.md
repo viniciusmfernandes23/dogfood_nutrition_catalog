@@ -2,6 +2,23 @@
 
 Este projeto é um pipeline automatizado de Engenharia de Dados focado na extração, normalização e análise de produtos de alimentação canina. Ele coleta dados da API da Cobasi, extrai informações nutricionais via web crawling e gera um Data Warehouse local em formato CSV, otimizado para visualização em ferramentas de BI como Power BI.
 
+## 🚀 Mapa de Fluxo do Pipeline
+
+O pipeline opera em um ciclo de vida de 5 estágios, garantindo que o dado bruto seja refinado até se tornar uma informação de negócio confiável:
+
+```mermaid
+graph TD
+    A[API Cobasi / VTEX] -->|Metadados & Preços| B(Ingestão Raw)
+    C[Web Crawler / HTML] -->|Níveis de Garantia| B
+    B --> D{Motor de Normalização}
+    D -->|Conversão de Escala 10x| E[Auditoria Biológica]
+    E -->|Validação Ca:P / Soma Macros| F{Barreira de Sanidade}
+    F -->|Anulação de Impossíveis| G[Camada Semântica]
+    G -->|Conversão para Escala Real| H[(Data Warehouse CSV)]
+    H --> I[Power BI / Analytics]
+    F -->|Log de Erros| J[sanity_audit_logs.csv]
+```
+
 ## 🚀 Funcionalidades Principais
 
 - **Extração Híbrida:** Combina requisições de API VTEX para metadados de produtos com Web Crawling para extração de Níveis de Garantia.

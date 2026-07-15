@@ -41,6 +41,10 @@ O pipeline é dividido em camadas modulares, cada uma com responsabilidades clar
 - **`fact_price_snapshot.py`**: Histórico diário de preços e disponibilidade.
 - **`exporter.py`**: Gerencia a escrita dos CSVs com uma **Barreira de Sanidade Final** obrigatória.
 
+### 2.5. Camada Semântica e Metadados (`app/normalization`)
+- **`metadata.py`**: Centraliza as definições de unidades, nomes de exibição e fatores de escala de saída.
+- **`semantic.py`**: Aplica transformações orientadas por metadados para converter a escala técnica interna em escala real de negócio.
+
 ---
 
 ## 3. Esquema de Dados e Convenções
@@ -93,5 +97,29 @@ O sistema aplica filtros rigorosos para anular ou corrigir dados impossíveis:
 ### Escala e Precisão
 Internamente, o pipeline foi simplificado para operar diretamente nas unidades reais onde possível. Onde escalas técnicas (10x) são usadas para preservar precisão decimal em inteiros, a **Camada Semântica** garante a reversão automática antes da escrita no CSV.
 
-### Rastreabilidade
-Todas as anulações realizadas pela **Barreira de Sanidade Final** são logadas no terminal, permitindo auditoria rápida de quais produtos possuem rótulos inconsistentes na origem (fornecedor).
+### Rastreabilidade e Auditoria (v1.4.x)
+Todas as anulações realizadas pela **Barreira de Sanidade Final** são persistidas no arquivo `sanity_audit_logs.csv`. Isso permite uma auditoria forense de quais produtos possuem rótulos inconsistentes na origem (fornecedor) ou erros sistemáticos de extração.
+
+#### Insights da Auditoria Sanitária:
+Uma análise detalhada dos logs revelou que a maioria das inconsistências interceptadas não decorre de valores impossíveis, mas de **erros sistemáticos de representação**, como mistura de unidades (`kcal/kg` vs `kcal/sachê`) e discrepâncias entre a API da Cobasi e os fabricantes. 
+
+**Proposta de Evolução:** O sistema deve evoluir de um mecanismo de rejeição pura para uma **Correção Assistida**, aplicando transformações confiáveis quando o padrão do erro for conhecido (ex: escala 10x em umidade de sachês), aumentando a completude do catálogo sem comprometer a integridade biológica.
+
+---
+
+## 6. Mapa de Fluxo do Pipeline
+
+O dado percorre um ciclo de refinamento contínuo até a camada analítica:
+
+```mermaid
+graph TD
+    A[API Cobasi / VTEX] -->|Metadados & Preços| B(Ingestão Raw)
+    C[Web Crawler / HTML] -->|Níveis de Garantia| B
+    B --> D{Motor de Normalização}
+    D -->|Escala Técnica 10x| E[Auditoria Biológica]
+    E -->|Validação Ca:P / Macros| F{Barreira de Sanidade}
+    F -->|Anulação de Impossíveis| G[Camada Semântica]
+    G -->|Conversão Escala Real| H[(Data Warehouse CSV)]
+    H --> I[Power BI / Analytics]
+    F -->|Log de Erros| J[sanity_audit_logs.csv]
+```
