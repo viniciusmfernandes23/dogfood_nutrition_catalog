@@ -40,11 +40,11 @@ class WarehouseExporter:
         dataframe: pd.DataFrame,
         filename: str,
     ) -> Path:
-        """Dimensões são sobrescritas para manter o estado atual."""
+        """Dimensões são incrementais para evitar perda de produtos em execuções parciais."""
         return self._export_csv(
             dataframe,
             filename,
-            append=False
+            append=True
         )
 
     def export_fact(
