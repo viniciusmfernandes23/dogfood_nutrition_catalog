@@ -205,26 +205,19 @@ def run_extraction():
             print(f"\nPipeline concluído com sucesso!")
             
             # 5. Formatação Final para o Usuário (Power BI Friendly)
-            print("Aplicando formatação de moeda para exportação final...")
+            print("Aplicando formatação de moeda para arquivos no Warehouse...")
             
             for name, path in result.exported_files.items():
-                dest_path = os.path.join(OUTPUT_DIR, os.path.basename(str(path)))
-                
-                # Garante que o diretório de destino existe
-                os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-                
-                # Se for a tabela de preços, aplicamos a formatação de moeda
+                # Se for a tabela de preços, aplicamos a formatação de moeda diretamente no arquivo do warehouse
                 if name == "fact_price_snapshot":
                     temp_df = pd.read_csv(path, encoding="utf-8-sig")
                     # Formata as colunas de preço para padrão brasileiro (vírgula como decimal)
                     for col in ['price', 'price_per_kg', 'subscriber_price']:
                         if col in temp_df.columns:
                             temp_df[col] = temp_df[col].apply(format_currency)
-                    temp_df.to_csv(dest_path, index=False, encoding="utf-8-sig")
-                else:
-                    shutil.copy(str(path), dest_path)
+                    temp_df.to_csv(path, index=False, encoding="utf-8-sig")
                 
-                print(f"  - {dest_path}")
+                print(f"  - {path}")
         else:
             print(f"Erro no orquestrador: {result.errors}")
 
