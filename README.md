@@ -54,6 +54,19 @@ Para detalhes aprofundados sobre a arquitetura, histórico de correções e esqu
 - [**Relatório Técnico Consolidado**](docs/RELATORIO_TECNICO_CONSOLIDADO.md)
 
 
+## 🛠️ Como Executar os Testes (Pré-Pull Request)
+
+Para garantir que as novas funcionalidades de multiloja e integração com a Petlove não quebraram o projeto, execute o script unificado:
+
+```bash
+./run_pre_pr_tests.sh
+```
+
+Este script executará:
+1.  **Integração Petlove**: Valida a extração de SKUs e EANs da Petlove.
+2.  **Multi-variação de Preço**: Valida se o warehouse suporta múltiplas embalagens por produto.
+3.  **Warehouse Core**: Executa os testes existentes do projeto para garantir que não houve regressão.
+
 ## 🛠️ Como Executar
 
 1.  **Instale as dependências:**
