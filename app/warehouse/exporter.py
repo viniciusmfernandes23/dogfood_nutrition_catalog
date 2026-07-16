@@ -173,7 +173,13 @@ class WarehouseExporter:
                 if "fact_nutrient" in filename:
                     headers = ["product_id", "nutrient_name", "nutrient_value", "collected_at"]
                 elif "fact_price" in filename:
-                    headers = ["product_id", "price", "collected_at"]
+                    headers = [
+                        "product_id", "sku_id", "sku_name",
+                        "package_weight_kg", "price", "list_price",
+                        "subscriber_price", "price_per_kg",
+                        "available", "collected_at",
+                        "has_price", "has_price_per_kg", "has_subscriber_price",
+                    ]
                 elif "dim_product" in filename:
                     headers = ["product_id", "name", "brand", "category"]
                 
@@ -188,8 +194,10 @@ class WarehouseExporter:
             # Converte da escala técnica interna para a escala de negócio real
             dataframe = SemanticLayer.apply_output_conversion(dataframe)
 
-        if filename == "fact_price_snapshot.csv" and "price" in dataframe.columns:
-            dataframe["price"] = dataframe["price"].round(2)
+        if filename == "fact_price_snapshot.csv":
+            for price_col in ("price", "list_price", "subscriber_price", "price_per_kg"):
+                if price_col in dataframe.columns:
+                    dataframe[price_col] = dataframe[price_col].round(2)
 
         # Se for append e o arquivo já existir, carregamos o existente para evitar duplicatas
         if append and output_file.exists():
@@ -198,7 +206,7 @@ class WarehouseExporter:
                 existing_df = pd.read_csv(output_file, encoding="utf-8-sig")
                 
                 # Garante tipos consistentes para detecção de duplicatas
-                for col in ["product_id", "collected_at", "nutrient_name"]:
+                for col in ["product_id", "collected_at", "nutrient_name", "sku_id"]:
                     if col in existing_df.columns:
                         existing_df[col] = existing_df[col].astype(str)
                     if col in dataframe.columns:
@@ -220,13 +228,17 @@ class WarehouseExporter:
                     # Ordena por data para que 'last' seja realmente o mais recente
                     combined_df = combined_df.sort_values(by="collected_at_dt")
                 
-                # Ajuste: No caso de fact_price_snapshot, a deduplicação deve usar apenas a data (sem hora)
-                # pois o pipeline atualiza os preços diariamente
+                # Ajuste: No caso de fact_price_snapshot, a deduplicação deve usar
+                # product_id + sku_id + data para preservar múltiplas variações do
+                # mesmo produto coletadas no mesmo dia (ex: embalagens de 10kg, 15kg, 20kg).
                 if filename == "fact_price_snapshot.csv" and "collected_at" in combined_df.columns:
                     # Cria coluna temporária apenas com a data para deduplicação
                     combined_df["_date_only"] = combined_df["collected_at_dt"].dt.date
-                    subset = ["product_id", "_date_only"]
-                    combined_df = combined_df.drop_duplicates(subset=subset, keep='last')
+                    # Inclui sku_id na chave de deduplicação para preservar variações distintas
+                    price_subset = ["product_id", "_date_only"]
+                    if "sku_id" in combined_df.columns:
+                        price_subset.append("sku_id")
+                    combined_df = combined_df.drop_duplicates(subset=price_subset, keep='last')
                     combined_df = combined_df.drop(columns=["_date_only"])
                 else:
                     # Remove duplicatas (mantém a versão mais recente se houver conflito no mesmo timestamp)

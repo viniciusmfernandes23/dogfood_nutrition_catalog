@@ -3,6 +3,7 @@ import numpy as np
 from datetime import datetime
 import sys
 import os
+import re
 import shutil
 
 # Garantir que o diretório app está no path
@@ -14,6 +15,14 @@ from app.pipeline.orchestrator import PipelineOrchestrator
 from app.pipeline.models import PipelineConfig
 from app.parsers.nutrition_parser import parse_nutrition
 
+# Padrão para extrair peso em kg a partir do nome do SKU.
+# Exemplos reconhecidos: "15kg", "10,1 kg", "1.5kg", "500g", "2x15kg"
+_WEIGHT_PATTERN = re.compile(
+    r"(?:(\d+(?:[.,]\d+)?)\s*x\s*)?(\d+(?:[.,]\d+)?)\s*(kg|g)\b",
+    re.IGNORECASE,
+)
+
+
 def format_currency(value):
     """Formata valor para padrão de moeda brasileira amigável ao Power BI."""
     if value is None or pd.isna(value):
@@ -23,6 +32,85 @@ def format_currency(value):
     # e SEM separador de milhar para evitar que o Power BI confunda o ponto com milhar.
     # Ex: 1500.50 -> "1500,50"
     return f"{value:.2f}".replace(".", ",")
+
+
+def _parse_weight_kg(sku_name: str | None) -> float | None:
+    """
+    Extrai o peso em kg a partir do nome do SKU.
+
+    Suporta formatos como "15kg", "10,1 kg", "500g", "2x15kg".
+    Retorna None quando não é possível determinar o peso.
+    """
+    if not sku_name:
+        return None
+    match = _WEIGHT_PATTERN.search(sku_name)
+    if not match:
+        return None
+    multiplier_str, value_str, unit = match.groups()
+    value = float(value_str.replace(",", "."))
+    if unit.lower() == "g":
+        value = value / 1000.0
+    if multiplier_str:
+        multiplier = float(multiplier_str.replace(",", "."))
+        value = multiplier * value
+    return round(value, 4)
+
+
+def _extract_sku_variations(api_payload: dict) -> list[dict]:
+    """
+    Extrai todas as variações de SKU (items) de um payload VTEX, retornando
+    uma lista de dicionários com os campos de preço de cada variação.
+
+    Para rações, cada item representa uma embalagem diferente (ex: 10,1kg, 15kg, 20kg),
+    cada uma com seu próprio preço, preço de lista e disponibilidade.
+
+    Estrutura VTEX relevante:
+        product.items[]                     → lista de SKUs/variações
+            .itemId                         → ID único do SKU
+            .name                           → nome da variação (ex: "Frango e Carne 15kg")
+            .sellers[].commertialOffer
+                .Price                      → preço de venda atual
+                .ListPrice                  → preço de tabela (sem desconto)
+                .AvailableQuantity          → quantidade disponível em estoque
+    """
+    variations = []
+    items = api_payload.get("items", [])
+
+    for item in items:
+        sku_id = item.get("itemId")
+        sku_name = item.get("name")
+        package_weight_kg = _parse_weight_kg(sku_name)
+
+        price = None
+        list_price = None
+        available = False
+
+        sellers = item.get("sellers", [])
+        if sellers:
+            # Prioriza o seller principal (índice 0, geralmente a própria loja)
+            comm = sellers[0].get("commertialOffer", {})
+            price = comm.get("Price")
+            list_price = comm.get("ListPrice")
+            available = comm.get("AvailableQuantity", 0) > 0
+
+        # Calcula price_per_kg quando peso e preço estão disponíveis
+        price_per_kg = None
+        if price is not None and package_weight_kg and package_weight_kg > 0:
+            price_per_kg = round(price / package_weight_kg, 4)
+
+        variations.append({
+            "sku_id": sku_id,
+            "sku_name": sku_name,
+            "package_weight_kg": package_weight_kg,
+            "price": price,
+            "list_price": list_price,
+            "subscriber_price": None,  # Não disponível na API pública VTEX
+            "price_per_kg": price_per_kg,
+            "available": available,
+        })
+
+    return variations
+
 
 # fix_nutrient_scale removido pois o parser atual já retorna o valor real
 
@@ -61,7 +149,7 @@ def run_extraction():
     else:
         print(f"Usando pasta de saída em: {ABS_OUTPUT_DIR}")
     
-    print(f"--- Pipeline Dogfood Nutrition Catalog v1.2.2 ---")
+    print(f"--- Pipeline Dogfood Nutrition Catalog v1.3.0 ---")
     print(f"Data/Hora local: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
 
     try:
@@ -82,27 +170,48 @@ def run_extraction():
         else:
             product_list = []
             for p in raw_products:
+                # Extrai todas as variações de SKU do payload VTEX.
+                # Cada variação representa uma embalagem diferente (ex: 10,1kg, 15kg, 20kg)
+                # com seu próprio preço, preço de lista e disponibilidade.
+                sku_variations = []
+                if hasattr(p, 'api_payload') and p.api_payload:
+                    try:
+                        sku_variations = _extract_sku_variations(p.api_payload)
+                    except Exception:
+                        pass
+
+                # Fallback: se não houver variações extraídas, cria uma entrada vazia
+                # para manter o produto no catálogo mesmo sem dados de preço
+                if not sku_variations:
+                    sku_variations = [{
+                        "sku_id": None,
+                        "sku_name": None,
+                        "package_weight_kg": None,
+                        "price": None,
+                        "list_price": None,
+                        "subscriber_price": None,
+                        "price_per_kg": None,
+                        "available": False,
+                    }]
+
                 p_dict = {
                     'product_id': p.product_id,
                     'product_name': p.product_name,
                     'brand': p.brand,
                     'url': p.url,
                     'category_id': p.category_id,
-                    'price': None,
-                    'available': False,
+                    # sku_variations: lista de dicts com dados de preço por variação.
+                    # O PriceSnapshotFactBuilder expande cada variação em uma linha separada.
+                    'sku_variations': sku_variations,
+                    # Campos escalares de preço mantidos para compatibilidade com outros
+                    # módulos do pipeline (normalização, semântica, dim_product, etc.)
+                    # Usa a primeira variação disponível como valor representativo.
+                    'price': next(
+                        (v['price'] for v in sku_variations if v.get('price') is not None),
+                        None,
+                    ),
+                    'available': any(v.get('available', False) for v in sku_variations),
                 }
-                
-                if hasattr(p, 'api_payload') and p.api_payload:
-                    try:
-                        items = p.api_payload.get('items', [])
-                        if items:
-                            sellers = items[0].get('sellers', [])
-                            if sellers:
-                                comm = sellers[0].get('commertialOffer', {})
-                                p_dict['price'] = comm.get('Price')
-                                p_dict['available'] = comm.get('AvailableQuantity', 0) > 0
-                    except Exception:
-                        pass
                 product_list.append(p_dict)
             
         df = pd.DataFrame(product_list)
@@ -212,7 +321,7 @@ def run_extraction():
                 if name == "fact_price_snapshot":
                     temp_df = pd.read_csv(path, encoding="utf-8-sig")
                     # Formata as colunas de preço para padrão brasileiro (vírgula como decimal)
-                    for col in ['price', 'price_per_kg', 'subscriber_price']:
+                    for col in ['price', 'list_price', 'subscriber_price', 'price_per_kg']:
                         if col in temp_df.columns:
                             temp_df[col] = temp_df[col].apply(format_currency)
                     temp_df.to_csv(path, index=False, encoding="utf-8-sig")

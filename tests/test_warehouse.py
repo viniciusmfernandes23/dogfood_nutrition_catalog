@@ -117,6 +117,30 @@ def sample_dataframe() -> pd.DataFrame:
 
             "source": ["crawler"],
 
+            # Variações de SKU com preços por embalagem (multi-variação)
+            "sku_variations": [[
+                {
+                    "sku_id": "SKU001A",
+                    "sku_name": "Ração Super Premium Frango 10kg",
+                    "package_weight_kg": 10.0,
+                    "price": 179.90,
+                    "list_price": 199.90,
+                    "subscriber_price": 161.91,
+                    "price_per_kg": 17.99,
+                    "available": True,
+                },
+                {
+                    "sku_id": "SKU001B",
+                    "sku_name": "Ração Super Premium Frango 15kg",
+                    "package_weight_kg": 15.0,
+                    "price": 249.90,
+                    "list_price": 279.90,
+                    "subscriber_price": 224.91,
+                    "price_per_kg": 16.66,
+                    "available": True,
+                },
+            ]],
+
         }
 
     )
@@ -174,7 +198,8 @@ def test_build_fact_price_snapshot():
         sample_dataframe()
     )
 
-    assert len(fact) == 1
+    # Com 2 variações de SKU no sample_dataframe, espera-se 2 linhas
+    assert len(fact) == 2
 
     assert (
         "price"
@@ -183,6 +208,26 @@ def test_build_fact_price_snapshot():
 
     assert (
         "price_per_kg"
+        in fact.columns
+    )
+
+    assert (
+        "sku_id"
+        in fact.columns
+    )
+
+    assert (
+        "sku_name"
+        in fact.columns
+    )
+
+    assert (
+        "package_weight_kg"
+        in fact.columns
+    )
+
+    assert (
+        "list_price"
         in fact.columns
     )
 
@@ -385,17 +430,18 @@ def test_fact_price_has_price_flags():
         sample_dataframe()
     )
 
-    row = fact.iloc[0]
+    # Verifica flags em todas as variações
+    for _, row in fact.iterrows():
 
-    assert row["has_price"]
+        assert row["has_price"]
 
-    assert row[
-        "has_price_per_kg"
-    ]
+        assert row[
+            "has_price_per_kg"
+        ]
 
-    assert row[
-        "has_subscriber_price"
-    ]
+        assert row[
+            "has_subscriber_price"
+        ]
 
 
 def test_exporter_lists_csvs(
