@@ -27,11 +27,15 @@ def format_currency(value):
     """Formata valor para padrão de moeda brasileira amigável ao Power BI."""
     if value is None or pd.isna(value):
         return None
-    # Para evitar que o Power BI interprete errado o separador decimal:
-    # A melhor prática para CSVs brasileiros é usar o formato decimal com vírgula 
-    # e SEM separador de milhar para evitar que o Power BI confunda o ponto com milhar.
-    # Ex: 1500.50 -> "1500,50"
-    return f"{value:.2f}".replace(".", ",")
+    
+    try:
+        # Tenta converter para float caso venha como string ou outro tipo
+        num_value = float(str(value).replace(",", "."))
+        # Formata com duas casas decimais e troca ponto por vírgula
+        return f"{num_value:.2f}".replace(".", ",")
+    except (ValueError, TypeError):
+        # Se não for possível converter, retorna o valor original (ou string dele)
+        return str(value)
 
 
 def _parse_weight_kg(sku_name: str | None) -> float | None:
