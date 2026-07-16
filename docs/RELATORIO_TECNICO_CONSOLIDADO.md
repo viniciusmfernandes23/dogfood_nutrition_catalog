@@ -1,6 +1,6 @@
 # Relatório Técnico Consolidado: Dogfood Nutrition Catalog
-**Versão Atual do Pipeline:** v1.4.4
-**Data da Última Atualização:** 14 de Julho de 2026
+**Versão Atual do Pipeline:** v1.5.2
+**Data da Última Atualização:** 16 de Julho de 2026
 
 ---
 
@@ -69,26 +69,37 @@ O sistema aplica filtros rigorosos para anular ou corrigir dados impossíveis:
 
 ## 4. Histórico de Evolução (Log de Versões)
 
-### v1.4.4 (Atual) - Correção da Regressão do Potássio
-- Implementação de word boundary (\b) seletivo para evitar conflitos entre aliases curtos ("P") e longos ("Potássio").
-- Restauração da cobertura total de potássio (> 500 registros).
+### v1.5.2 - Correção de Erro Crítico de Formatação de Moeda
+- **Commit:** `d5a30c1`
+- **Descrição:** Corrigido o erro `ValueError: Unknown format code 'f' for object of type 'str'` na função `format_currency`. A função foi tornada resiliente a diferentes tipos de entrada (float, int, string com ponto/vírgula e nulos) ao tentar converter para float antes de formatar e lidar com exceções.
+
+### v1.5.1 - Ajustes no Modelo Semântico para Integridade Referencial
+- **Commit:** `e66a04d`
+- **Descrição:** Refatoração do modelo semântico para garantir a integridade referencial no Power BI após a introdução de múltiplos SKUs. O campo `sku` foi removido da `dim_product` para evitar ambiguidade, e `product_id` foi consolidado como a chave primária única da dimensão. A relação entre `dim_product` e `fact_price_snapshot` agora é 1:N via `product_id`, com `sku_id` servindo como chave de detalhamento na fato de preços. Correção de erro de arredondamento em colunas com valores nulos no `exporter.py`.
+
+### v1.5.0 - Captura de Múltiplas Variações de Preço por SKU
+- **Commit:** `f653b62`
+- **Descrição:** Implementação da captura de todas as variações de SKU (embalagens/tamanhos) para cada produto, com seus respectivos preços, preços de lista, preços por kg e disponibilidade. O `fact_price_snapshot.csv` agora contém uma linha por SKU/Produto/Dia, permitindo análises detalhadas por embalagem. Introdução de `sku_id`, `sku_name`, `package_weight_kg`, `list_price`, `subscriber_price` e `price_per_kg` no `PriceSnapshotFact` e no pipeline de extração.
+
+### v1.4.4 - Correção da Regressão do Potássio
+- **Commit:** `caeb0d9`
+- **Descrição:** Implementação de word boundary (\b) seletivo para evitar conflitos entre aliases curtos ("P") e longos ("Potássio"). Restauração da cobertura total de potássio (> 500 registros).
 
 ### v1.4.3 - Precisão de Escala e Agregação
-- Fim da escala 10x indevida na exportação de minerais e energia.
-- Implementação de lógica de prioridade na agregação (específico > genérico).
-- Bloqueio de unidades "por sachê" na energia por kg.
+- **Commit:** `c8dd0ad`
+- **Descrição:** Fim da escala 10x indevida na exportação de minerais e energia. Implementação de lógica de prioridade na agregação (específico > genérico). Bloqueio de unidades "por sachê" na energia por kg.
 
 ### v1.4.2 - Robustez na Coleta
-- Implementação de Retry Inteligente no `HttpClient`.
-- Remoção do fallback silencioso para dados simulados em caso de erro na API.
+- **Commit:** `579c745`
+- **Descrição:** Implementação de Retry Inteligente no `HttpClient`. Remoção do fallback silencioso para dados simulados em caso de erro na API.
 
 ### v1.4.1 - Auditoria Biológica Avançada
-- Trava de minerais insignificantes (< 1 mg/kg).
-- Validação de macronutrientes mínimos para integridade da linha.
+- **Commit:** `dca555e`
+- **Descrição:** Trava de minerais insignificantes (< 1 mg/kg). Validação de macronutrientes mínimos para integridade da linha.
 
 ### v1.4.0 - Arquitetura Consolidada
-- Padronização definitiva de unidades e criação do esquema de governança.
-- Sincronização de Timezone (Horário Local) em todo o pipeline.
+- **Commit:** `ab0f58b`
+- **Descrição:** Padronização definitiva de unidades e criação do esquema de governança. Sincronização de Timezone (Horário Local) em todo o pipeline.
 
 ---
 

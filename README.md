@@ -31,6 +31,7 @@ graph TD
 - **Robustez de Coleta:** Mecanismo de **Retry Inteligente** com backoff exponencial para lidar com instabilidades de API.
 - **Power BI Ready:** Exportação em formato regional brasileiro (R$) e modelagem Star Schema.
 - **Inteligência Semântica:** Classificação automática de Porte, Idade, Tier e Fonte de Proteína.
+- **Captura Multi-SKU de Preços:** Coleta detalhada de preços para todas as variações de embalagem/tamanho de um produto, incluindo preço por kg, preço de lista e preço de assinante.
 
 ## 📁 Estrutura do Projeto
 
@@ -66,27 +67,32 @@ Para detalhes aprofundados sobre a arquitetura, histórico de correções e esqu
     ```
     *Use `--mode full` para garantir a limpeza completa e reprocessamento de todos os dados, ativando todas as novas validações e correções.*
 
+    Para atualizar apenas os preços (mais rápido):
+    ```bash
+    python executar_pipeline.py --mode price
+    ```
+
 3.  **Verifique os resultados:**
-    Os arquivos serão gerados na pasta `/output`:
-    - `dim_product.csv`: Cadastro de produtos.
-    - `fact_nutrient.csv`: Histórico de níveis nutricionais.
-    - `fact_price_snapshot.csv`: Histórico de preços semanal.
+    Os arquivos serão gerados na pasta `/output/warehouse`:
+    - `dim_product.csv`: Cadastro de produtos (1 linha por produto).
+    - `fact_nutrient.csv`: Histórico de níveis nutricionais (1 linha por nutriente/produto/dia).
+    - `fact_price_snapshot.csv`: Histórico de preços detalhado (1 linha por SKU/produto/dia).
 
 ## 📊 Modelagem de Dados
 
-O projeto segue os princípios de Data Warehousing:
-- **Dimensões:** Mantêm o estado atual dos produtos.
-- **Fatos:** Registram eventos no tempo (coletas de preços e nutrientes), permitindo análises de séries temporais.
+O projeto segue os princípios de Data Warehousing, com um modelo Star Schema otimizado para Power BI:
 
-## 🐛 Histórico de Versões Recentes
+| Tabela | Chave Primária (PK) | Chave Estrangeira (FK) | Granularidade |
+|---|---|---|---|
+| **`dim_product`** | `product_id` | - | 1 linha por Produto |
+| **`fact_nutrient`** | - | `product_id` | 1 linha por Nutriente/Produto/Dia |
+| **`fact_price_snapshot`** | - | `product_id` | 1 linha por SKU/Produto/Dia |
 
--   **v1.4.4:** Correção da regressão do Potássio via word boundaries (\b).
--   **v1.4.3:** Correção global de escalas de exportação e priorização de agregação.
--   **v1.4.2:** Mecanismo de Retry Inteligente na API Cobasi.
--   **v1.4.1:** Auditoria Biológica Avançada e travas de minerais essenciais.
--   **v1.4.0:** Padronização de Schema e Sincronização de Timezone.
--   **v1.3.x:** Introdução da Auditoria de Coerência Nutricional.
--   **v1.2.x:** Implementação da Barreira de Sanidade Final e eliminação de artefatos de ponto flutuante.
+**Relacionamentos no Power BI:**
+- `dim_product` (PK: `product_id`) relaciona-se com `fact_nutrient` (FK: `product_id`) em uma relação 1 para N.
+- `dim_product` (PK: `product_id`) relaciona-se com `fact_price_snapshot` (FK: `product_id`) em uma relação 1 para N.
+
+O `sku_id`, `sku_name` e `package_weight_kg` em `fact_price_snapshot` permitem análises detalhadas por variação de embalagem, enquanto `product_id` mantém a integridade referencial com a dimensão principal.
 
 ## 🔧 Tecnologias Utilizadas
 
