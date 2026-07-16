@@ -27,8 +27,6 @@ class ProductDimension(WarehouseModel):
 
     product_id: int | None
 
-    sku: str | None
-
     brand: str | None
 
     product_name: str | None

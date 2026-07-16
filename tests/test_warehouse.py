@@ -29,8 +29,6 @@ def sample_dataframe() -> pd.DataFrame:
 
             "product_id": [1],
 
-            "sku": ["SKU001"],
-
             "brand": ["Premier"],
 
             "manufacturer": ["Premier Pet"],

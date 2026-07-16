@@ -14,7 +14,6 @@ class ProductDimensionBuilder:
 
     DEFAULT_COLUMNS = (
         "product_id",
-        "sku",
         "brand",
         "product_name",
         "product_url",
@@ -54,8 +53,6 @@ class ProductDimensionBuilder:
             ProductDimension(
 
                 product_id=row.get("product_id"),
-
-                sku=row.get("sku"),
 
                 brand=row.get("brand"),
 

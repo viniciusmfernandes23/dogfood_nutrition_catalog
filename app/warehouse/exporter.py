@@ -181,7 +181,7 @@ class WarehouseExporter:
                         "has_price", "has_price_per_kg", "has_subscriber_price",
                     ]
                 elif "dim_product" in filename:
-                    headers = ["product_id", "name", "brand", "category"]
+                    headers = ["product_id", "brand", "product_name", "product_category"]
                 
                 pd.DataFrame(columns=headers).to_csv(output_file, index=False, encoding="utf-8-sig")
             return output_file
@@ -197,7 +197,8 @@ class WarehouseExporter:
         if filename == "fact_price_snapshot.csv":
             for price_col in ("price", "list_price", "subscriber_price", "price_per_kg"):
                 if price_col in dataframe.columns:
-                    dataframe[price_col] = dataframe[price_col].round(2)
+                    # Converte para numérico e arredonda apenas valores válidos
+                    dataframe[price_col] = pd.to_numeric(dataframe[price_col], errors='coerce').round(2)
 
         # Se for append e o arquivo já existir, carregamos o existente para evitar duplicatas
         if append and output_file.exists():
