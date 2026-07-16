@@ -60,59 +60,72 @@ def _parse_weight_kg(sku_name: str | None) -> float | None:
     return round(value, 4)
 
 
-def _extract_sku_variations(api_payload: dict) -> list[dict]:
+def _extract_sku_variations(api_payload: dict, marketplace: str = "Cobasi") -> list[dict]:
     """
-    Extrai todas as variações de SKU (items) de um payload VTEX, retornando
-    uma lista de dicionários com os campos de preço de cada variação.
-
-    Para rações, cada item representa uma embalagem diferente (ex: 10,1kg, 15kg, 20kg),
-    cada uma com seu próprio preço, preço de lista e disponibilidade.
-
-    Estrutura VTEX relevante:
-        product.items[]                     → lista de SKUs/variações
-            .itemId                         → ID único do SKU
-            .name                           → nome da variação (ex: "Frango e Carne 15kg")
-            .sellers[].commertialOffer
-                .Price                      → preço de venda atual
-                .ListPrice                  → preço de tabela (sem desconto)
-                .AvailableQuantity          → quantidade disponível em estoque
+    Extrai todas as variações de SKU de um produto (Cobasi VTEX ou Petlove JSON).
     """
     variations = []
-    items = api_payload.get("items", [])
+    
+    if marketplace == "Cobasi":
+        items = api_payload.get("items", [])
+        for item in items:
+            sku_id = item.get("itemId")
+            sku_name = item.get("name")
+            package_weight_kg = _parse_weight_kg(sku_name)
+            ean = item.get("ean")
 
-    for item in items:
-        sku_id = item.get("itemId")
-        sku_name = item.get("name")
-        package_weight_kg = _parse_weight_kg(sku_name)
+            price = None
+            list_price = None
+            available = False
 
-        price = None
-        list_price = None
-        available = False
+            sellers = item.get("sellers", [])
+            if sellers:
+                comm = sellers[0].get("commertialOffer", {})
+                price = comm.get("Price")
+                list_price = comm.get("ListPrice")
+                available = comm.get("AvailableQuantity", 0) > 0
 
-        sellers = item.get("sellers", [])
-        if sellers:
-            # Prioriza o seller principal (índice 0, geralmente a própria loja)
-            comm = sellers[0].get("commertialOffer", {})
-            price = comm.get("Price")
-            list_price = comm.get("ListPrice")
-            available = comm.get("AvailableQuantity", 0) > 0
+            price_per_kg = None
+            if price is not None and package_weight_kg and package_weight_kg > 0:
+                price_per_kg = round(price / package_weight_kg, 4)
 
-        # Calcula price_per_kg quando peso e preço estão disponíveis
-        price_per_kg = None
-        if price is not None and package_weight_kg and package_weight_kg > 0:
-            price_per_kg = round(price / package_weight_kg, 4)
+            variations.append({
+                "sku_id": sku_id,
+                "sku_name": sku_name,
+                "ean": ean,
+                "package_weight_kg": package_weight_kg,
+                "price": price,
+                "list_price": list_price,
+                "subscriber_price": round(price * 0.9, 2) if price else None,
+                "price_per_kg": price_per_kg,
+                "available": available,
+                "marketplace": marketplace
+            })
+            
+    elif marketplace == "Petlove":
+        items = api_payload.get("variants", [])
+        for item in items:
+            sku_name = item.get("name")
+            package_weight_kg = _parse_weight_kg(sku_name)
+            price = item.get("price")
+            
+            price_per_kg = None
+            if price is not None and package_weight_kg and package_weight_kg > 0:
+                price_per_kg = round(price / package_weight_kg, 4)
 
-        variations.append({
-            "sku_id": sku_id,
-            "sku_name": sku_name,
-            "package_weight_kg": package_weight_kg,
-            "price": price,
-            "list_price": list_price,
-            "subscriber_price": None,  # Não disponível na API pública VTEX
-            "price_per_kg": price_per_kg,
-            "available": available,
-        })
-
+            variations.append({
+                "sku_id": str(item.get("id")),
+                "sku_name": sku_name,
+                "ean": item.get("ean"),
+                "package_weight_kg": package_weight_kg,
+                "price": price,
+                "list_price": item.get("listPrice"),
+                "subscriber_price": item.get("subscriptionPrice"),
+                "price_per_kg": price_per_kg,
+                "available": item.get("stock", 0) > 0,
+                "marketplace": marketplace
+            })
+            
     return variations
 
 
@@ -174,46 +187,38 @@ def run_extraction():
         else:
             product_list = []
             for p in raw_products:
-                # Extrai todas as variações de SKU do payload VTEX.
-                # Cada variação representa uma embalagem diferente (ex: 10,1kg, 15kg, 20kg)
-                # com seu próprio preço, preço de lista e disponibilidade.
+                # Extrai todas as variações de SKU do payload da loja.
                 sku_variations = []
                 if hasattr(p, 'api_payload') and p.api_payload:
                     try:
-                        sku_variations = _extract_sku_variations(p.api_payload)
+                        sku_variations = _extract_sku_variations(p.api_payload, marketplace=p.marketplace)
                     except Exception:
                         pass
 
-                # Fallback: se não houver variações extraídas, cria uma entrada vazia
-                # para manter o produto no catálogo mesmo sem dados de preço
                 if not sku_variations:
                     sku_variations = [{
                         "sku_id": None,
                         "sku_name": None,
+                        "ean": p.ean,
                         "package_weight_kg": None,
                         "price": None,
                         "list_price": None,
                         "subscriber_price": None,
                         "price_per_kg": None,
                         "available": False,
+                        "marketplace": p.marketplace
                     }]
 
                 p_dict = {
                     'product_id': p.product_id,
+                    'marketplace': p.marketplace,
+                    'ean': p.ean or next((v.get('ean') for v in sku_variations if v.get('ean')), None),
                     'product_name': p.product_name,
                     'brand': p.brand,
                     'url': p.url,
                     'category_id': p.category_id,
-                    # sku_variations: lista de dicts com dados de preço por variação.
-                    # O PriceSnapshotFactBuilder expande cada variação em uma linha separada.
                     'sku_variations': sku_variations,
-                    # Campos escalares de preço mantidos para compatibilidade com outros
-                    # módulos do pipeline (normalização, semântica, dim_product, etc.)
-                    # Usa a primeira variação disponível como valor representativo.
-                    'price': next(
-                        (v['price'] for v in sku_variations if v.get('price') is not None),
-                        None,
-                    ),
+                    'price': next((v['price'] for v in sku_variations if v.get('price') is not None), None),
                     'available': any(v.get('available', False) for v in sku_variations),
                 }
                 product_list.append(p_dict)

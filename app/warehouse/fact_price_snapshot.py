@@ -129,6 +129,8 @@ class PriceSnapshotFactBuilder:
 
         fact = PriceSnapshotFact(
             product_id=product_id,
+            marketplace=variation.get("marketplace") or "Cobasi",
+            ean=variation.get("ean"),
             sku_id=str(variation.get("sku_id")) if variation.get("sku_id") is not None else None,
             sku_name=sku_name,
             package_weight_kg=package_weight_kg,
@@ -162,6 +164,8 @@ class PriceSnapshotFactBuilder:
 
         fact = PriceSnapshotFact(
             product_id=row.get("product_id"),
+            marketplace=row.get("marketplace") or "Cobasi",
+            ean=row.get("ean"),
             sku_id=str(row.get("sku")) if row.get("sku") is not None else None,
             sku_name=sku_name,
             package_weight_kg=package_weight_kg,

@@ -65,6 +65,12 @@ class CobasiAPICollector:
 
             for product in data:
 
+                # Tenta extrair EAN do primeiro SKU
+                ean = None
+                items = product.get("items", [])
+                if items:
+                    ean = items[0].get("ean")
+
                 results.append(
                     ProductCollection(
                         product_id=int(product["productId"]),
@@ -72,6 +78,8 @@ class CobasiAPICollector:
                         brand=product.get("brand"),
                         url=product.get("link"),
                         category_id=category_id,
+                        marketplace="Cobasi",
+                        ean=ean,
                         api_payload=product,
                     )
                 )

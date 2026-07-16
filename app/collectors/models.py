@@ -14,4 +14,6 @@ class ProductCollection:
     url: str | None
 
     category_id: int | None
+    marketplace: str = "Cobasi"
+    ean: str | None = None
     api_payload: dict[str, Any] | None = None

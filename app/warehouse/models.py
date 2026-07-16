@@ -96,7 +96,8 @@ class PriceSnapshotFact(WarehouseModel):
     """
 
     product_id: int | None
-
+    marketplace: str | None
+    ean: str | None
     sku_id: str | None
 
     sku_name: str | None

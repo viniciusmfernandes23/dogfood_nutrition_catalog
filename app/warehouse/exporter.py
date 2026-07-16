@@ -174,7 +174,7 @@ class WarehouseExporter:
                     headers = ["product_id", "nutrient_name", "nutrient_value", "collected_at"]
                 elif "fact_price" in filename:
                     headers = [
-                        "product_id", "sku_id", "sku_name",
+                        "product_id", "marketplace", "ean", "sku_id", "sku_name",
                         "package_weight_kg", "price", "list_price",
                         "subscriber_price", "price_per_kg",
                         "available", "collected_at",
@@ -207,7 +207,7 @@ class WarehouseExporter:
                 existing_df = pd.read_csv(output_file, encoding="utf-8-sig")
                 
                 # Garante tipos consistentes para detecção de duplicatas
-                for col in ["product_id", "collected_at", "nutrient_name", "sku_id"]:
+                for col in ["product_id", "collected_at", "nutrient_name", "sku_id", "marketplace", "ean"]:
                     if col in existing_df.columns:
                         existing_df[col] = existing_df[col].astype(str)
                     if col in dataframe.columns:
@@ -235,10 +235,12 @@ class WarehouseExporter:
                 if filename == "fact_price_snapshot.csv" and "collected_at" in combined_df.columns:
                     # Cria coluna temporária apenas com a data para deduplicação
                     combined_df["_date_only"] = combined_df["collected_at_dt"].dt.date
-                    # Inclui sku_id na chave de deduplicação para preservar variações distintas
+                    # Inclui sku_id e marketplace na chave de deduplicação para preservar variações distintas
                     price_subset = ["product_id", "_date_only"]
                     if "sku_id" in combined_df.columns:
                         price_subset.append("sku_id")
+                    if "marketplace" in combined_df.columns:
+                        price_subset.append("marketplace")
                     combined_df = combined_df.drop_duplicates(subset=price_subset, keep='last')
                     combined_df = combined_df.drop(columns=["_date_only"])
                 else:
