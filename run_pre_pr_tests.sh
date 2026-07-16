@@ -4,6 +4,14 @@ echo "===================================================="
 echo "🚀 Iniciando Testes Pré-Pull Request (Branch Petlove)"
 echo "===================================================="
 
+# Verifica se o pytest está instalado
+if ! python3 -m pytest --version > /dev/null 2>&1; then
+    echo "❌ Erro: 'pytest' não encontrado no ambiente virtual."
+    echo "💡 Por favor, instale as dependências executando:"
+    echo "   pip install -r app/requirements.txt"
+    exit 1
+fi
+
 # 1. Testes de Integração Petlove e Multiloja (Novos)
 echo -e "\n[1/3] Rodando testes de integração Petlove..."
 python3 tests/test_petlove_integration.py
@@ -16,7 +24,7 @@ fi
 
 # 2. Testes de Variação de Preço (v1.5.0)
 echo -e "\n[2/3] Rodando testes de multi-variação de preço..."
-python3 tests/test_price_multivariation.py
+python3 -m pytest tests/test_price_multivariation.py -v
 if [ $? -eq 0 ]; then
     echo "✅ Testes de multi-variação de preço passaram!"
 else
