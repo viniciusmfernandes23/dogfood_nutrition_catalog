@@ -65,41 +65,59 @@ class PetzCollector:
             # ou via script de prateleira. Vamos tentar extrair do HTML retornado.
             results = []
             
-            # Tenta encontrar itens de produto
-            product_items = soup.select('li.li-product')
-            if not product_items:
-                # Tenta seletor alternativo
-                product_items = soup.select('.product-item')
-
+            # A Petz usa uma estrutura de lista com cards de produto
+            product_items = soup.select('li.li-product, .product-item, div[data-id]')
+            
             for item in product_items:
                 try:
                     # Link e ID
-                    link_tag = item.select_one('a')
+                    link_tag = item.select_one('a[href*="/produto/"]')
+                    if not link_tag: 
+                        link_tag = item.select_one('a')
                     if not link_tag: continue
                     
                     product_url = link_tag.get('href', '')
                     if not product_url.startswith('http'):
                         product_url = f"{self.BASE_URL}{product_url}"
                     
-                    # ID do produto (geralmente no final da URL ou em data-id)
-                    product_id = item.get('data-id')
+                    # ID do produto
+                    product_id = item.get('data-id') or item.get('id')
                     if not product_id:
                         id_match = re.search(r'-(\d+)$', product_url)
                         product_id = id_match.group(1) if id_match else product_url.split('/')[-1]
 
                     # Nome
-                    name_tag = item.select_one('.product-name, h3, .name')
-                    name = name_tag.get_text(strip=True) if name_tag else "Produto sem nome"
+                    name_tag = item.select_one('.product-name, h3, .name, [itemprop="name"]')
+                    name = name_tag.get_text(strip=True) if name_tag else ""
+                    if not name and link_tag.get('title'):
+                        name = link_tag.get('title')
                     
-                    # Preço
-                    # Na Petz tem preço normal e preço assinante
-                    price_tag = item.select_one('.price-current, .current-price, .price')
-                    price_text = price_tag.get_text(strip=True) if price_tag else None
-                    price = self._parse_price(price_text)
+                    # Preço (Normal e Assinante)
+                    # Tenta encontrar todos os preços no card
+                    prices = item.select('.price-current, .current-price, .price, .normal-price, b')
+                    price = None
+                    for p_tag in prices:
+                        p_val = self._parse_price(p_tag.get_text())
+                        if p_val:
+                            price = p_val
+                            break
                     
-                    sub_price_tag = item.select_one('.price-subscriber, .subscriber-price')
-                    sub_price_text = sub_price_tag.get_text(strip=True) if sub_price_tag else None
-                    sub_price = self._parse_price(sub_price_text)
+                    sub_prices = item.select('.price-subscriber, .subscriber-price, .price-assinante')
+                    sub_price = None
+                    for sp_tag in sub_prices:
+                        sp_val = self._parse_price(sp_tag.get_text())
+                        if sp_val:
+                            sub_price = sp_val
+                            break
+                    
+                    if not price and not sub_price:
+                        # Tenta extrair do texto bruto do item se os seletores falharem
+                        text = item.get_text()
+                        price_matches = re.findall(r'R\$\s*(\d+,\d{2})', text)
+                        if price_matches:
+                            price = self._parse_price(price_matches[0])
+                            if len(price_matches) > 1:
+                                sub_price = self._parse_price(price_matches[-1])
 
                     # Marca (opcional no card)
                     brand = None

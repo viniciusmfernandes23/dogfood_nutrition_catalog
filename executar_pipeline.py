@@ -215,12 +215,20 @@ def run_extraction():
             print("Não foi possível coletar os produtos reais da Cobasi. Interrompendo para evitar dados corrompidos.")
             raise RuntimeError(f"Falha crítica na extração da API Cobasi: {e}")
 
-        # 1.1 Coleta de dados da Petlove
+        # 1.1 Preparação de Queries Dinâmicas baseadas na Cobasi
+        # Extraímos as marcas únicas coletadas da Cobasi para buscar nos outros marketplaces
+        brands = sorted(list(set(p.brand for p in raw_products if p.brand)))
+        # Se não houver marcas, usamos termos genéricos como fallback
+        dynamic_queries = [f"racao {b}" for b in brands] if brands else ["racao premier", "racao golden", "racao royal canin"]
+        # Limitamos a quantidade de queries para evitar bloqueios excessivos, focando nas principais marcas
+        search_queries = dynamic_queries[:12] 
+        
+        print(f"\nMarcas detectadas para busca cruzada: {', '.join(brands[:8])}...")
+
+        # 1.2 Coleta de dados da Petlove
         print("\nIniciando coleta na Petlove...")
         try:
             petlove_collector = PetloveCrawlerCollector()
-            # Termos de busca básicos para coletar um bom volume de rações
-            search_queries = ["racao premier", "racao golden", "racao royal canin", "racao nd", "racao granplus", "racao guabi", "racao biofresh", "racao formula natural"]
             petlove_products = petlove_collector.fetch_all(search_queries)
             if petlove_products:
                 print(f"Sucesso: {len(petlove_products)} produtos coletados na Petlove.")
@@ -231,11 +239,10 @@ def run_extraction():
             print(f"\nERRO NA PETLOVE: {e}")
             print("Continuando para o próximo marketplace.")
 
-        # 1.2 Coleta de dados da Petz
+        # 1.3 Coleta de dados da Petz
         print("\nIniciando coleta na Petz...")
         try:
             petz_collector = PetzCollector()
-            search_queries = ["racao premier", "racao golden", "racao royal canin", "racao nd", "racao granplus", "racao guabi", "racao biofresh", "racao formula natural"]
             petz_products = petz_collector.fetch_all(search_queries)
             if petz_products:
                 print(f"Sucesso: {len(petz_products)} produtos coletados na Petz.")
