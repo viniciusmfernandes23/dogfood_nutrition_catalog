@@ -23,7 +23,7 @@ class PetloveCrawlerCollector:
         Busca produtos na Petlove e extrai as informações básicas.
         """
         logger.info(f"Buscando na Petlove: {query}")
-        url = f"{self.SEARCH_URL}{query}"
+        url = f"{self.SEARCH_URL}{query.replace(' ', '+')}"
         
         try:
             response = self.client.get(url)

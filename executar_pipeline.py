@@ -104,9 +104,14 @@ def _extract_sku_variations(api_payload: dict, marketplace: str = "Cobasi") -> l
             })
             
     elif marketplace == "Petlove":
+        # A Petlove pode vir com variants ou ser um produto único (payload simplificado)
         items = api_payload.get("variants", [])
+        if not items and "price" in api_payload:
+            # Caso o payload seja de um único SKU já expandido
+            items = [api_payload]
+            
         for item in items:
-            sku_name = item.get("name")
+            sku_name = item.get("name") or api_payload.get("name")
             package_weight_kg = _parse_weight_kg(sku_name)
             price = item.get("price")
             
@@ -115,15 +120,15 @@ def _extract_sku_variations(api_payload: dict, marketplace: str = "Cobasi") -> l
                 price_per_kg = round(price / package_weight_kg, 4)
 
             variations.append({
-                "sku_id": str(item.get("id")),
+                "sku_id": str(item.get("id") or api_payload.get("id")),
                 "sku_name": sku_name,
-                "ean": item.get("ean"),
+                "ean": item.get("ean") or api_payload.get("ean"),
                 "package_weight_kg": package_weight_kg,
                 "price": price,
                 "list_price": item.get("listPrice"),
                 "subscriber_price": item.get("subscriptionPrice"),
                 "price_per_kg": price_per_kg,
-                "available": item.get("stock", 0) > 0,
+                "available": item.get("stock", 0) > 0 or item.get("available", False),
                 "marketplace": marketplace
             })
             
