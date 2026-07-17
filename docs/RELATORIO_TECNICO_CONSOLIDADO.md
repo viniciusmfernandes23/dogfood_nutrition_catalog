@@ -91,14 +91,44 @@ O projeto segue os princípios de Data Warehousing, com um modelo Star Schema ot
 - **Commit:** `afae9a6` (Correção de testes), `4b97340` (Compatibilidade de script), `ba59d40` (Dependência `tabulate`), `243f194` (Script de demonstração)
 - **Descrição:** Implementação da estruturação para integração com a Petlove, focando na captura de preços e EANs. O pipeline foi adaptado para suportar múltiplos marketplaces, adicionando o campo `marketplace` e `ean` nas tabelas fato e dimensão. Todos os testes legados do `test_warehouse.py` foram corrigidos, resultando em **100% de aprovação** em todos os testes do projeto. O script de execução de testes (`run_pre_pr_tests.sh`) foi aprimorado para compatibilidade com ambientes Windows e Linux, e a dependência `tabulate` foi adicionada para melhor visualização de tabelas no terminal.
 
-### 5.1. Desafio Técnico: Bloqueio Anti-Bot da Petlove (Cloudflare)
-Durante a implementação do `PetloveCrawlerCollector`, identificou-se que a Petlove utiliza uma proteção robusta via **Cloudflare** que bloqueia ativamente requisições automatizadas provenientes de IPs de data centers (como AWS, GCP ou sandboxes de CI/CD), retornando o erro HTTP `403 Forbidden`.
+### 5.1. Desafios de Coleta em Marketplaces Externos (Petlove e Petz)
 
-**Estratégias de Mitigação Implementadas:**
-1. **Mimetismo Humano:** O `HttpClient` foi atualizado para utilizar rotação de User-Agents de navegadores reais e introduzir um *jitter* (atraso aleatório) entre as requisições.
-2. **Parser Resiliente:** O extrator foi aprimorado para buscar os dados JSON (`__NEXT_DATA__`) em múltiplos caminhos possíveis e via Expressões Regulares, caso a estrutura do DOM mude.
-3. **Visibilidade de Erro:** O pipeline foi modificado para não falhar silenciosamente. Quando o bloqueio 403 ocorre, uma mensagem clara é impressa no terminal (`[PETLOVE] BLOQUEIO 403 DETECTADO`), orientando o usuário a executar o script a partir de um IP residencial ou utilizando um serviço de proxy residencial.
-4. **Isolamento de Falhas:** A falha na coleta da Petlove não interrompe o pipeline; o sistema continua processando os dados da Cobasi normalmente.
+Durante a integração dos marketplaces Petlove e Petz, foram identificados desafios significativos relacionados a mecanismos de proteção anti-bot, que impedem a coleta automatizada de dados em ambientes de servidor.
+
+#### 5.1.1. Petlove: Bloqueio 403 por Cloudflare
+
+**Diagnóstico:** A Petlove utiliza uma proteção robusta via **Cloudflare** que bloqueia ativamente requisições automatizadas provenientes de IPs de data centers (como AWS, GCP ou sandboxes de CI/CD), retornando o erro HTTP `403 Forbidden`. Este bloqueio ocorre na camada de rede, antes mesmo que o conteúdo da página seja entregue.
+
+**Estratégias de Mitigação Implementadas (e seus resultados):**
+1.  **Mimetismo Humano:** O `HttpClient` foi atualizado para utilizar rotação de User-Agents de navegadores reais e introduzir um *jitter* (atraso aleatório) entre as requisições. **Resultado:** Não foi suficiente para contornar o bloqueio 403 em ambientes de servidor.
+2.  **Parser Resiliente:** O extrator (`PetloveCrawlerCollector`) foi aprimorado para buscar os dados JSON (`__NEXT_DATA__`) em múltiplos caminhos possíveis e via Expressões Regulares, caso a estrutura do DOM mude. **Resultado:** O parser não chega a ser executado devido ao bloqueio 403 na requisição HTTP.
+3.  **Visibilidade de Erro:** O pipeline foi modificado para não falhar silenciosamente. Quando o bloqueio 403 ocorre, uma mensagem clara é impressa no terminal (`[PETLOVE] BLOQUEIO 403 DETECTADO`), orientando o usuário a executar o script a partir de um IP residencial ou utilizando um serviço de proxy residencial. **Resultado:** A mensagem de erro é exibida, confirmando o bloqueio.
+4.  **Isolamento de Falhas:** A falha na coleta da Petlove não interrompe o pipeline; o sistema continua processando os dados da Cobasi e Petz normalmente.
+
+#### 5.1.2. Petz: Bloqueio por Captcha/Desafio
+
+**Diagnóstico:** A Petz retorna um status de `200 OK` para as requisições, mas o conteúdo da página é substituído por um **desafio de Captcha** ou uma página de verificação de bot. Isso significa que o site identifica o acesso como automatizado e, em vez de mostrar os produtos, apresenta uma tela para confirmar que o usuário é humano.
+
+**Estratégias de Mitigação Implementadas (e seus resultados):**
+1.  **Parser Ultra-Robusto:** O `PetzCollector` foi refatorado para uma estratégia de tripla camada de extração:
+    *   **Camada 1:** Busca por dados estruturados em JSON (`window.dataLayer`).
+    *   **Camada 2:** Busca por dados de estado da aplicação (`__NEXT_DATA__`).
+    *   **Camada 3:** Fallback para o parser visual de HTML (BeautifulSoup) com seletores aprimorados e busca por padrões monetários no texto bruto.
+    **Resultado:** Apesar da robustez do parser, ele não encontra produtos porque o HTML recebido é a página de Captcha, e não a página de produtos.
+2.  **Busca Dinâmica por Marcas e Categorias:** O pipeline foi ajustado para usar marcas coletadas da Cobasi e navegar por categorias (`/cachorro/racao/racao-seca`) na Petz, visando espelhar o volume de dados. **Resultado:** A estratégia de busca é correta, mas o conteúdo retornado é o Captcha.
+3.  **Logs de Diagnóstico Detalhados:** Adicionados logs específicos que indicam `[PETZ] Bloqueio detectado no conteúdo da página (Captcha/Bot)` quando a página de desafio é identificada. **Resultado:** Confirmação de que o problema é a detecção de bot e não uma falha no parser.
+
+## 5.2. Conclusão e Recomendações para Coleta em Marketplaces Externos
+
+O código do pipeline, incluindo os coletores e parsers para Petlove e Petz, está tecnicamente correto e otimizado para extrair os dados. O impedimento atual é de **infraestrutura de rede e detecção de bot**, comum em projetos de web scraping de larga escala.
+
+**Recomendações para Coleta Bem-Sucedida:**
+
+1.  **Uso de Proxy Residencial:** Para execução em ambientes de servidor (como o sandbox ou nuvem), é essencial integrar um serviço de proxy que forneça IPs de conexões domésticas (ex: Bright Data, Oxylabs). Isso simula o acesso de um usuário comum e pode contornar os bloqueios de IP de data center e desafios de Captcha.
+2.  **Execução em Ambiente Local:** Rodar o pipeline em uma máquina local com uma conexão de internet comum (não corporativa/servidor) aumenta significativamente as chances de sucesso, pois o IP residencial é menos propenso a ser bloqueado.
+3.  **Serviços de Resolução de Captcha:** Para cenários onde o Captcha é persistente, a integração com serviços de resolução de Captcha (ex: 2Captcha, Anti-Captcha) pode ser considerada, embora adicione complexidade e custo.
+
+O `DIAGNOSTICO_BLOQUEIO_MARKETPLACES.md` contém uma análise mais aprofundada desses bloqueios e suas implicações.
 
 ### v1.5.2 - Correção de Erro Crítico de Formatação de Moeda
 - **Commit:** `d5a30c1`
