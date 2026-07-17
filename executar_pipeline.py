@@ -10,6 +10,7 @@ import shutil
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from app.collectors.cobasi_api import CobasiAPICollector
+from app.collectors.petlove_crawler import PetloveCrawlerCollector
 from app.collectors.crawler import CobasiCrawler
 from app.pipeline.orchestrator import PipelineOrchestrator
 from app.pipeline.models import PipelineConfig
@@ -170,19 +171,28 @@ def run_extraction():
     print(f"Data/Hora local: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
 
     try:
-        # 1. Coleta de dados da API
-        collector = CobasiAPICollector()
+        # 1. Coleta de dados da API (Cobasi)
+        cobasi_collector = CobasiAPICollector()
         try:
-            raw_products = collector.fetch_all()
+            raw_products = cobasi_collector.fetch_all()
         except Exception as e:
             print(f"\nERRO NA API COBASI: {e}")
-            print("Não foi possível coletar os produtos reais. Interrompendo para evitar dados corrompidos.")
-            # Em vez de injetar dados simulados silenciosamente, agora lançamos o erro
-            # para que o usuário saiba que a extração falhou.
-            raise RuntimeError(f"Falha crítica na extração da API: {e}")
+            print("Não foi possível coletar os produtos reais da Cobasi. Interrompendo para evitar dados corrompidos.")
+            raise RuntimeError(f"Falha crítica na extração da API Cobasi: {e}")
+
+        # 1.1 Coleta de dados da Petlove
+        petlove_collector = PetloveCrawlerCollector()
+        try:
+            # Termos de busca básicos para coletar um bom volume de rações
+            search_queries = ["racao premier", "racao golden", "racao royal canin", "racao nd", "racao granplus", "racao guabi", "racao biofresh", "racao formula natural"]
+            petlove_products = petlove_collector.fetch_all(search_queries)
+            raw_products.extend(petlove_products)
+        except Exception as e:
+            print(f"\nAVISO: Erro ao coletar da Petlove: {e}")
+            print("Continuando apenas com dados da Cobasi.")
 
         if not raw_products:
-            print("AVISO: Nenhum produto retornado pela API. Verifique os filtros ou status do serviço.")
+            print("AVISO: Nenhum produto retornado pelos coletores. Verifique os filtros ou status do serviço.")
             product_list = []
         else:
             product_list = []
