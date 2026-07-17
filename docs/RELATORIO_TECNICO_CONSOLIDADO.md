@@ -91,6 +91,15 @@ O projeto segue os princípios de Data Warehousing, com um modelo Star Schema ot
 - **Commit:** `afae9a6` (Correção de testes), `4b97340` (Compatibilidade de script), `ba59d40` (Dependência `tabulate`), `243f194` (Script de demonstração)
 - **Descrição:** Implementação da estruturação para integração com a Petlove, focando na captura de preços e EANs. O pipeline foi adaptado para suportar múltiplos marketplaces, adicionando o campo `marketplace` e `ean` nas tabelas fato e dimensão. Todos os testes legados do `test_warehouse.py` foram corrigidos, resultando em **100% de aprovação** em todos os testes do projeto. O script de execução de testes (`run_pre_pr_tests.sh`) foi aprimorado para compatibilidade com ambientes Windows e Linux, e a dependência `tabulate` foi adicionada para melhor visualização de tabelas no terminal.
 
+### 5.1. Desafio Técnico: Bloqueio Anti-Bot da Petlove (Cloudflare)
+Durante a implementação do `PetloveCrawlerCollector`, identificou-se que a Petlove utiliza uma proteção robusta via **Cloudflare** que bloqueia ativamente requisições automatizadas provenientes de IPs de data centers (como AWS, GCP ou sandboxes de CI/CD), retornando o erro HTTP `403 Forbidden`.
+
+**Estratégias de Mitigação Implementadas:**
+1. **Mimetismo Humano:** O `HttpClient` foi atualizado para utilizar rotação de User-Agents de navegadores reais e introduzir um *jitter* (atraso aleatório) entre as requisições.
+2. **Parser Resiliente:** O extrator foi aprimorado para buscar os dados JSON (`__NEXT_DATA__`) em múltiplos caminhos possíveis e via Expressões Regulares, caso a estrutura do DOM mude.
+3. **Visibilidade de Erro:** O pipeline foi modificado para não falhar silenciosamente. Quando o bloqueio 403 ocorre, uma mensagem clara é impressa no terminal (`[PETLOVE] BLOQUEIO 403 DETECTADO`), orientando o usuário a executar o script a partir de um IP residencial ou utilizando um serviço de proxy residencial.
+4. **Isolamento de Falhas:** A falha na coleta da Petlove não interrompe o pipeline; o sistema continua processando os dados da Cobasi normalmente.
+
 ### v1.5.2 - Correção de Erro Crítico de Formatação de Moeda
 - **Commit:** `d5a30c1`
 - **Descrição:** Corrigido o erro `ValueError: Unknown format code 'f' for object of type 'str'` na função `format_currency`. A função foi tornada resiliente a diferentes tipos de entrada (float, int, string com ponto/vírgula e nulos) ao tentar converter para float antes de formatar e lidar com exceções.

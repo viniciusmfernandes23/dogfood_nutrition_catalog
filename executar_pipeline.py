@@ -11,6 +11,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from app.collectors.cobasi_api import CobasiAPICollector
 from app.collectors.petlove_crawler import PetloveCrawlerCollector
+from app.collectors.petz_collector import PetzCollector
 from app.collectors.crawler import CobasiCrawler
 from app.pipeline.orchestrator import PipelineOrchestrator
 from app.pipeline.models import PipelineConfig
@@ -132,6 +133,29 @@ def _extract_sku_variations(api_payload: dict, marketplace: str = "Cobasi") -> l
                 "marketplace": marketplace
             })
             
+    elif marketplace == "Petz":
+        # A Petz via crawler de busca retorna um payload simplificado por item
+        sku_name = api_payload.get("name")
+        package_weight_kg = _parse_weight_kg(sku_name)
+        price = api_payload.get("price")
+        
+        price_per_kg = None
+        if price is not None and package_weight_kg and package_weight_kg > 0:
+            price_per_kg = round(price / package_weight_kg, 4)
+
+        variations.append({
+            "sku_id": str(api_payload.get("id")),
+            "sku_name": sku_name,
+            "ean": api_payload.get("ean"),
+            "package_weight_kg": package_weight_kg,
+            "price": price,
+            "list_price": None,
+            "subscriber_price": api_payload.get("subscriptionPrice"),
+            "price_per_kg": price_per_kg,
+            "available": True, # Se está na busca, assumimos disponível
+            "marketplace": marketplace
+        })
+            
     return variations
 
 
@@ -199,7 +223,22 @@ def run_extraction():
                 print("Aviso: Nenhum produto retornado pela Petlove (verifique logs de bloqueio acima).")
         except Exception as e:
             print(f"\nERRO NA PETLOVE: {e}")
-            print("Continuando apenas com dados da Cobasi.")
+            print("Continuando para o próximo marketplace.")
+
+        # 1.2 Coleta de dados da Petz
+        print("\nIniciando coleta na Petz...")
+        petz_collector = PetzCollector()
+        try:
+            search_queries = ["racao premier", "racao golden", "racao royal canin", "racao nd", "racao granplus", "racao guabi", "racao biofresh", "racao formula natural"]
+            petz_products = petz_collector.fetch_all(search_queries)
+            if petz_products:
+                print(f"Sucesso: {len(petz_products)} produtos coletados na Petz.")
+                raw_products.extend(petz_products)
+            else:
+                print("Aviso: Nenhum produto retornado pela Petz.")
+        except Exception as e:
+            print(f"\nERRO NA PETZ: {e}")
+            print("Continuando com os dados coletados até agora.")
 
         if not raw_products:
             print("AVISO: Nenhum produto retornado pelos coletores. Verifique os filtros ou status do serviço.")
