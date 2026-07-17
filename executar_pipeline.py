@@ -200,10 +200,16 @@ def run_extraction():
     print(f"Data/Hora local: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
 
     try:
+        raw_products = []
+
         # 1. Coleta de dados da API (Cobasi)
+        print("\nIniciando coleta na Cobasi...")
         cobasi_collector = CobasiAPICollector()
         try:
-            raw_products = cobasi_collector.fetch_all()
+            cobasi_products = cobasi_collector.fetch_all()
+            if cobasi_products:
+                print(f"Sucesso: {len(cobasi_products)} produtos coletados na Cobasi.")
+                raw_products.extend(cobasi_products)
         except Exception as e:
             print(f"\nERRO NA API COBASI: {e}")
             print("Não foi possível coletar os produtos reais da Cobasi. Interrompendo para evitar dados corrompidos.")
@@ -211,8 +217,8 @@ def run_extraction():
 
         # 1.1 Coleta de dados da Petlove
         print("\nIniciando coleta na Petlove...")
-        petlove_collector = PetloveCrawlerCollector()
         try:
+            petlove_collector = PetloveCrawlerCollector()
             # Termos de busca básicos para coletar um bom volume de rações
             search_queries = ["racao premier", "racao golden", "racao royal canin", "racao nd", "racao granplus", "racao guabi", "racao biofresh", "racao formula natural"]
             petlove_products = petlove_collector.fetch_all(search_queries)
@@ -227,8 +233,8 @@ def run_extraction():
 
         # 1.2 Coleta de dados da Petz
         print("\nIniciando coleta na Petz...")
-        petz_collector = PetzCollector()
         try:
+            petz_collector = PetzCollector()
             search_queries = ["racao premier", "racao golden", "racao royal canin", "racao nd", "racao granplus", "racao guabi", "racao biofresh", "racao formula natural"]
             petz_products = petz_collector.fetch_all(search_queries)
             if petz_products:
