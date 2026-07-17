@@ -26,21 +26,54 @@ class PetloveCrawlerCollector:
         url = f"{self.SEARCH_URL}{query.replace(' ', '+')}"
         
         try:
-            response = self.client.get(url)
-            soup = BeautifulSoup(response.text, 'html.parser')
+            try:
+                response = self.client.get(url)
+                html = response.text
+            except Exception as e:
+                if "403" in str(e):
+                    logger.error(f"BLOQUEIO 403 DETECTADO na Petlove. O site está recusando conexões automatizadas deste ambiente.")
+                    logger.info("DICA: Para coletar dados da Petlove, execute o pipeline em um ambiente com IP residencial ou use um serviço de proxy.")
+                raise e
+
+            soup = BeautifulSoup(html, 'html.parser')
             
             # A Petlove armazena os dados em um script JSON chamado __NEXT_DATA__
             script = soup.find('script', id='__NEXT_DATA__')
             if not script:
-                logger.warning("Script __NEXT_DATA__ não encontrado na Petlove.")
-                return []
-
-            data = json.loads(script.string)
+                # Tenta buscar por padrões de texto se o script não estiver no DOM direto
+                match = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', html)
+                if match:
+                    data = json.loads(match.group(1))
+                else:
+                    logger.warning("Script __NEXT_DATA__ não encontrado na Petlove.")
+                    return []
+            else:
+                data = json.loads(script.string)
             
             # Navega no JSON para encontrar os produtos
             # Estrutura: props -> pageProps -> initialData -> products
             try:
-                products_data = data['props']['pageProps']['initialData']['products']
+                # Tenta diferentes caminhos comuns em aplicações Next.js
+                products_data = None
+                paths = [
+                    ['props', 'pageProps', 'initialData', 'products'],
+                    ['props', 'pageProps', 'products'],
+                    ['props', 'pageProps', 'data', 'products']
+                ]
+                for path in paths:
+                    curr = data
+                    for key in path:
+                        if isinstance(curr, dict) and key in curr:
+                            curr = curr[key]
+                        else:
+                            curr = None
+                            break
+                    if curr:
+                        products_data = curr
+                        break
+                
+                if not products_data:
+                    raise KeyError("products")
             except KeyError:
                 logger.warning("Estrutura de produtos não encontrada no JSON da Petlove.")
                 return []

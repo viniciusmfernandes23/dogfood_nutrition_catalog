@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-
+import random
 import httpx
 
 from app.core.config import settings
@@ -11,15 +11,30 @@ from app.core.logging import logger
 class HttpClient:
 
     def __init__(self):
-
+        self.user_agents = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0"
+        ]
         self.client = httpx.Client(
             timeout=settings.timeout,
             follow_redirects=True,
-            headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            },
         )
+
+    def _get_headers(self):
+        return {
+            "User-Agent": random.choice(self.user_agents),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Referer": "https://www.google.com/",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "cross-site",
+            "Sec-Fetch-User": "?1",
+        }
 
     def get(
         self,
@@ -27,8 +42,12 @@ class HttpClient:
     ) -> httpx.Response:
 
         for attempt in range(settings.retries):
+            # Adiciona um jitter aleatório para parecer mais humano
+            if attempt > 0:
+                time.sleep(random.uniform(1.0, 3.0))
+            
             try:
-                response = self.client.get(url)
+                response = self.client.get(url, headers=self._get_headers())
                 response.raise_for_status()
                 return response
             except httpx.HTTPStatusError as e:
