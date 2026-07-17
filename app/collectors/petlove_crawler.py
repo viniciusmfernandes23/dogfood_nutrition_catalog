@@ -31,8 +31,13 @@ class PetloveCrawlerCollector:
                 html = response.text
             except Exception as e:
                 if "403" in str(e):
-                    logger.error(f"BLOQUEIO 403 DETECTADO na Petlove. O site está recusando conexões automatizadas deste ambiente.")
-                    logger.info("DICA: Para coletar dados da Petlove, execute o pipeline em um ambiente com IP residencial ou use um serviço de proxy.")
+                    msg = "BLOQUEIO 403 DETECTADO na Petlove. O site está recusando conexões automatizadas deste ambiente."
+                    tip = "DICA: Para coletar dados da Petlove, execute o pipeline em um ambiente com IP residencial ou use um serviço de proxy."
+                    logger.error(msg)
+                    logger.info(tip)
+                    # Força impressão no stdout para garantir visibilidade mesmo se o logger estiver silenciado
+                    print(f"\n[PETLOVE] {msg}")
+                    print(f"[PETLOVE] {tip}\n")
                 raise e
 
             soup = BeautifulSoup(html, 'html.parser')

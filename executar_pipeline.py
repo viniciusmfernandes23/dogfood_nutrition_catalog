@@ -186,14 +186,19 @@ def run_extraction():
             raise RuntimeError(f"Falha crítica na extração da API Cobasi: {e}")
 
         # 1.1 Coleta de dados da Petlove
+        print("\nIniciando coleta na Petlove...")
         petlove_collector = PetloveCrawlerCollector()
         try:
             # Termos de busca básicos para coletar um bom volume de rações
             search_queries = ["racao premier", "racao golden", "racao royal canin", "racao nd", "racao granplus", "racao guabi", "racao biofresh", "racao formula natural"]
             petlove_products = petlove_collector.fetch_all(search_queries)
-            raw_products.extend(petlove_products)
+            if petlove_products:
+                print(f"Sucesso: {len(petlove_products)} produtos coletados na Petlove.")
+                raw_products.extend(petlove_products)
+            else:
+                print("Aviso: Nenhum produto retornado pela Petlove (verifique logs de bloqueio acima).")
         except Exception as e:
-            print(f"\nAVISO: Erro ao coletar da Petlove: {e}")
+            print(f"\nERRO NA PETLOVE: {e}")
             print("Continuando apenas com dados da Cobasi.")
 
         if not raw_products:
