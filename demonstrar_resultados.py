@@ -10,7 +10,9 @@ from app.warehouse.fact_price_snapshot import PriceSnapshotFactBuilder
 from app.warehouse.exporter import WarehouseExporter
 
 def demonstracao():
+    print("====================================================")
     print("🚀 Iniciando Demonstração de Resultados Multiloja...")
+    print("====================================================")
     
     # Simula dados de coleta de ambas as lojas para o mesmo produto (mesmo EAN)
     data = [
@@ -83,14 +85,24 @@ def demonstracao():
     
     path = exporter.export_fact(df_fact, "fact_price_snapshot.csv")
     
-    print(f"\n✅ Arquivo gerado em: {path}")
-    print("\n📊 Amostra do Resultado (fact_price_snapshot.csv):")
+    print(f"\n✅ Arquivo CSV gerado com sucesso!")
+    print(f"📍 Local: {path}")
+    print("\n📊 Amostra dos Resultados:")
     
-    # Exibe as colunas principais para conferência
     cols_to_show = ["marketplace", "sku_name", "ean", "price", "price_per_kg", "subscriber_price"]
-    print(df_fact[cols_to_show].to_markdown(index=False))
     
-    print("\n💡 Observe como o EAN '7896048911286' permite comparar o preço de 15kg entre Cobasi e Petlove!")
+    try:
+        # Tenta usar markdown se tabulate estiver disponível
+        print(df_fact[cols_to_show].to_markdown(index=False))
+    except Exception:
+        # Fallback para string padrão se tabulate falhar
+        print(df_fact[cols_to_show].to_string(index=False))
+    
+    print("\n" + "="*52)
+    print("💡 ANALISE O EAN '7896048911286':")
+    print("   Ele aparece tanto para Cobasi quanto para Petlove.")
+    print("   Isso permite a comparação direta no Power BI!")
+    print("="*52)
 
 if __name__ == "__main__":
     demonstracao()
