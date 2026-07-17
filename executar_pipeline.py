@@ -215,35 +215,37 @@ def run_extraction():
             print("Não foi possível coletar os produtos reais da Cobasi. Interrompendo para evitar dados corrompidos.")
             raise RuntimeError(f"Falha crítica na extração da API Cobasi: {e}")
 
-        # 1.1 Preparação de Queries Dinâmicas baseadas na Cobasi
-        # Extraímos as marcas únicas coletadas da Cobasi para buscar nos outros marketplaces
+        # 1.1 Preparação de Estratégia de Espelhamento
+        # Extraímos as marcas e categorias coletadas da Cobasi para espelhar nos outros marketplaces
         brands = sorted(list(set(p.brand for p in raw_products if p.brand)))
-        # Se não houver marcas, usamos termos genéricos como fallback
-        dynamic_queries = [f"racao {b}" for b in brands] if brands else ["racao premier", "racao golden", "racao royal canin"]
-        # Limitamos a quantidade de queries para evitar bloqueios excessivos, focando nas principais marcas
-        search_queries = dynamic_queries[:12] 
+        categories = ["/cachorro/racao/racao-seca", "/cachorro/racao/racao-umida"]
         
-        print(f"\nMarcas detectadas para busca cruzada: {', '.join(brands[:8])}...")
+        dynamic_queries = [f"racao {b}" for b in brands[:15]] # Top 15 marcas
+        
+        print(f"\n--- Estratégia de Espelhamento de Catálogo ---")
+        print(f"Marcas para busca: {', '.join(brands[:8])}...")
+        print(f"Categorias para raspagem: {', '.join(categories)}")
 
         # 1.2 Coleta de dados da Petlove
         print("\nIniciando coleta na Petlove...")
         try:
             petlove_collector = PetloveCrawlerCollector()
-            petlove_products = petlove_collector.fetch_all(search_queries)
+            # A Petlove ainda usa busca por queries (mais resiliente nela)
+            petlove_products = petlove_collector.fetch_all(dynamic_queries)
             if petlove_products:
                 print(f"Sucesso: {len(petlove_products)} produtos coletados na Petlove.")
                 raw_products.extend(petlove_products)
             else:
-                print("Aviso: Nenhum produto retornado pela Petlove (verifique logs de bloqueio acima).")
+                print("Aviso: Nenhum produto retornado pela Petlove.")
         except Exception as e:
             print(f"\nERRO NA PETLOVE: {e}")
-            print("Continuando para o próximo marketplace.")
 
         # 1.3 Coleta de dados da Petz
         print("\nIniciando coleta na Petz...")
         try:
             petz_collector = PetzCollector()
-            petz_products = petz_collector.fetch_all(search_queries)
+            # A Petz agora suporta busca por queries E categorias (espelhamento real)
+            petz_products = petz_collector.fetch_all(dynamic_queries, categories=categories)
             if petz_products:
                 print(f"Sucesso: {len(petz_products)} produtos coletados na Petz.")
                 raw_products.extend(petz_products)
@@ -251,7 +253,6 @@ def run_extraction():
                 print("Aviso: Nenhum produto retornado pela Petz.")
         except Exception as e:
             print(f"\nERRO NA PETZ: {e}")
-            print("Continuando com os dados coletados até agora.")
 
         if not raw_products:
             print("AVISO: Nenhum produto retornado pelos coletores. Verifique os filtros ou status do serviço.")
