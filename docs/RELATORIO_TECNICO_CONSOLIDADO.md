@@ -1,5 +1,5 @@
 # Relatório Técnico Consolidado: Dogfood Nutrition Catalog
-**Versão Atual do Pipeline:** v1.5.2
+**Versão Atual do Pipeline:** v1.6.0 (Proposta)
 **Data da Última Atualização:** 16 de Julho de 2026
 
 ---
@@ -13,6 +13,7 @@ O **Dogfood Nutrition Catalog** é um ecossistema automatizado para extração, 
 - **Normalização Universal:** Converter diversas unidades (%, mg/kg, kcal/g) para padrões canônicos.
 - **Robustez de Coleta:** Lidar com instabilidades de APIs e falhas de rede de forma resiliente.
 - **Prontidão para BI:** Exportar dados limpos, sem artefatos técnicos e com formatação regional adequada.
+- **Inteligência de Mercado Multiloja:** Permitir a comparação de preços e ofertas entre diferentes varejistas (ex: Cobasi, Petlove).
 
 ---
 
@@ -22,7 +23,8 @@ O pipeline é dividido em camadas modulares, cada uma com responsabilidades clar
 
 ### 2.1. Camada de Coleta (`app/collectors`)
 - **`cobasi_api.py`**: Integração com a API VTEX da Cobasi para metadados de estoque e preços.
-- **`crawler.py`**: Scraping de páginas para extração da seção de "Níveis de Garantia".
+- **`petlove_crawler.py`**: Módulo de web crawling para extração de preços e EANs da Petlove.
+- **`crawler.py`**: Scraping de páginas para extração da seção de "Níveis de Garantia" (Cobasi).
 - **`http_client.py`**: Cliente centralizado com **Backoff Exponencial** e **Jitter** para retentativas em erros 500.
 
 ### 2.2. Camada de Parsing (`app/parsers`)
@@ -38,8 +40,8 @@ O pipeline é dividido em camadas modulares, cada uma com responsabilidades clar
 ### 2.4. Camada de Warehouse (`app/warehouse`)
 - **`dim_product.py`**: Cadastro único de produtos (Dimensão).
 - **`fact_nutrient.py`**: Tabela fato de nutrientes em formato longo.
-- **`fact_price_snapshot.py`**: Histórico diário de preços e disponibilidade.
-- **`exporter.py`**: Gerencia a escrita dos CSVs com uma **Barreira de Sanidade Final** obrigatória.
+- **`fact_price_snapshot.py`**: Histórico diário de preços e disponibilidade, agora com suporte a múltiplos marketplaces e SKUs.
+- **`exporter.py`**: Gerencia a escrita dos CSVs com uma **Barreira de Sanidade Final** obrigatória e deduplicação inteligente para cenários multiloja.
 
 ### 2.5. Camada Semântica e Metadados (`app/normalization`)
 - **`metadata.py`**: Centraliza as definições de unidades, nomes de exibição e fatores de escala de saída.
@@ -65,9 +67,29 @@ O sistema aplica filtros rigorosos para anular ou corrigir dados impossíveis:
 4.  **Razão Ca:P:** Proporção Cálcio/Fósforo deve estar entre **0.9 e 4.5**.
 5.  **Densidade de Sódio:** Sódio excessivo em relação à proteína é identificado como erro de escala e anulado.
 
+### 3.3. Modelo de Dados para Comparação Multiloja
+O projeto segue os princípios de Data Warehousing, com um modelo Star Schema otimizado para Power BI, agora estendido para suportar múltiplos marketplaces:
+
+| Tabela | Chave Primária (PK) | Chave Estrangeira (FK) | Granularidade |
+|---|---|---|---|
+| **`dim_product`** | `product_id` | - | 1 linha por Produto (único entre marketplaces) |
+| **`fact_nutrient`** | - | `product_id` | 1 linha por Nutriente/Produto/Dia |
+| **`fact_price_snapshot`** | - | `product_id`, `marketplace`, `ean` | 1 linha por SKU/Produto/Marketplace/Dia |
+
+**Chave de Comparação Universal:** O campo `ean` (Código de Barras) é a chave principal para comparar o mesmo produto entre diferentes marketplaces. Quando o EAN não está disponível, uma chave composta (Marca + Nome Normalizado + Peso) pode ser utilizada para matching.
+
+**Relacionamentos no Power BI:**
+- `dim_product` (PK: `product_id`) relaciona-se com `fact_nutrient` (FK: `product_id`) em uma relação 1 para N.
+- `dim_product` (PK: `product_id`) relaciona-se com `fact_price_snapshot` (FK: `product_id`) em uma relação 1 para N.
+- O `marketplace`, `sku_id`, `sku_name` e `package_weight_kg` em `fact_price_snapshot` permitem análises detalhadas por variação de embalagem e loja.
+
 ---
 
 ## 4. Histórico de Evolução (Log de Versões)
+
+### v1.6.0 (Proposta) - Integração Petlove e Estabilidade Total
+- **Commit:** `afae9a6` (Correção de testes), `4b97340` (Compatibilidade de script), `ba59d40` (Dependência `tabulate`), `243f194` (Script de demonstração)
+- **Descrição:** Implementação da estruturação para integração com a Petlove, focando na captura de preços e EANs. O pipeline foi adaptado para suportar múltiplos marketplaces, adicionando o campo `marketplace` e `ean` nas tabelas fato e dimensão. Todos os testes legados do `test_warehouse.py` foram corrigidos, resultando em **100% de aprovação** em todos os testes do projeto. O script de execução de testes (`run_pre_pr_tests.sh`) foi aprimorado para compatibilidade com ambientes Windows e Linux, e a dependência `tabulate` foi adicionada para melhor visualização de tabelas no terminal.
 
 ### v1.5.2 - Correção de Erro Crítico de Formatação de Moeda
 - **Commit:** `d5a30c1`
@@ -126,11 +148,12 @@ O dado percorre um ciclo de refinamento contínuo até a camada analítica:
 graph TD
     A[API Cobasi / VTEX] -->|Metadados & Preços| B(Ingestão Raw)
     C[Web Crawler / HTML] -->|Níveis de Garantia| B
-    B --> D{Motor de Normalização}
-    D -->|Escala Técnica 10x| E[Auditoria Biológica]
-    E -->|Validação Ca:P / Macros| F{Barreira de Sanidade}
-    F -->|Anulação de Impossíveis| G[Camada Semântica]
-    G -->|Conversão Escala Real| H[(Data Warehouse CSV)]
-    H --> I[Power BI / Analytics]
-    F -->|Log de Erros| J[sanity_audit_logs.csv]
+    D[Petlove / Crawler] -->|Metadados & Preços| B
+    B --> E{Motor de Normalização}
+    E -->|Escala Técnica 10x| F[Auditoria Biológica]
+    F -->|Validação Ca:P / Macros| G{Barreira de Sanidade}
+    G -->|Anulação de Impossíveis| H[Camada Semântica]
+    H -->|Conversão Escala Real| I[(Data Warehouse CSV)]
+    I --> J[Power BI / Analytics]
+    G -->|Log de Erros| K[sanity_audit_logs.csv]
 ```
