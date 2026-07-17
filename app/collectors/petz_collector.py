@@ -78,6 +78,9 @@ class PetzCollector:
                             results.append(self._create_product_from_dict(item))
                 except: continue
         except: pass
+        
+        if results:
+            logger.info(f"  [PETZ] {len(results)} produtos extraídos via dataLayer.")
 
         # ESTRATÉGIA 2: Tenta extrair do __NEXT_DATA__ (Next.js)
         if not results:
@@ -86,20 +89,25 @@ class PetzCollector:
                 if next_data:
                     data = json.loads(next_data.group(1))
                     # Navega recursivamente no JSON em busca de objetos que pareçam produtos
+                    found_count = 0
                     def find_products(obj):
+                        nonlocal found_count
                         if isinstance(obj, dict):
                             if 'id' in obj and 'name' in obj and ('price' in obj or 'salePrice' in obj):
                                 results.append(self._create_product_from_dict(obj))
+                                found_count += 1
                             for v in obj.values(): find_products(v)
                         elif isinstance(obj, list):
                             for v in obj: find_products(v)
                     find_products(data)
+                    if found_count > 0:
+                        logger.info(f"  [PETZ] {found_count} produtos extraídos via __NEXT_DATA__.")
             except: pass
 
         # ESTRATÉGIA 3: Fallback para o parser de HTML (BS4) se os JSONs falharem
         if not results:
             soup = BeautifulSoup(html, 'html.parser')
-            product_items = soup.select('li.li-product, .product-item, div[data-id], .card-product')
+            product_items = soup.select('li.li-product, .product-item, div[data-id], .card-product, [itemtype*="Product"]')
             for item in product_items:
                 try:
                     link_tag = item.select_one('a[href*="/produto/"]') or item.select_one('a')
@@ -138,6 +146,18 @@ class PetzCollector:
                             api_payload={"price": price, "subscriptionPrice": sub_price, "name": name, "id": product_id}
                         ))
                 except: continue
+            
+            if results:
+                logger.info(f"  [PETZ] {len(results)} produtos extraídos via HTML (BS4).")
+        
+        if not results:
+            # Log de depuração final para entender o que o crawler viu
+            if "captcha" in html.lower() or "bot" in html.lower():
+                logger.warning("  [PETZ] Bloqueio detectado no conteúdo da página (Captcha/Bot).")
+            elif len(html) < 1000:
+                logger.warning(f"  [PETZ] Página retornou conteúdo suspeitamente curto ({len(html)} bytes).")
+            else:
+                logger.warning(f"  [PETZ] Página carregada ({len(html)} bytes), mas nenhum produto encontrado pelos 3 parsers.")
         
         return results
 
