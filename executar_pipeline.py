@@ -214,9 +214,9 @@ def run_extraction():
         # 4. Executar Orquestrador
         print("Finalizando processamento no Warehouse...")
         config = PipelineConfig(
-            extract_nutrition=is_full,
-            output_dir=OUTPUT_DIR,
-            normalize_units=True
+            full_update=is_full,
+            output_directory=OUTPUT_DIR,
+            warehouse_directory=os.path.join(OUTPUT_DIR, "warehouse")
         )
         orchestrator = PipelineOrchestrator(config)
         orchestrator.run(full_df)
