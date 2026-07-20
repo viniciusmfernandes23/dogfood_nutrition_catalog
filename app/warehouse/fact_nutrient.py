@@ -13,17 +13,63 @@ class NutrientFactBuilder:
     """
 
     NUTRIENT_COLUMNS = (
+        # Macronutrientes
         "protein_gkg",
         "fat_gkg",
         "fiber_gkg",
         "ash_gkg",
         "moisture_gkg",
+        
+        # Minerais
         "calcium_min_mgkg",
         "calcium_max_mgkg",
         "phosphorus_mgkg",
         "sodium_mgkg",
         "potassium_mgkg",
+        "magnesium_mgkg",
+        "chlorine_mgkg",
+        "iron_mgkg",
+        "zinc_mgkg",
+        "copper_mgkg",
+        "selenium_mgkg",
+        "iodine_mgkg",
+        "manganese_mgkg",
+
+        # Aminoácidos
+        "lysine_mgkg",
+        "methionine_mgkg",
+        "tryptophan_mgkg",
+        "arginine_mgkg",
+        "taurine_mgkg",
+        "l_carnitine_mgkg",
+
+        # Ácidos Graxos
+        "omega_3_mgkg",
+        "omega_6_mgkg",
+        "epa_dha_mgkg",
+
+        # Vitaminas
+        "vitamin_a_uikg",
+        "vitamin_d3_uikg",
+        "vitamin_e_uikg",
+        "vitamin_b1_mgkg",
+        "vitamin_b2_mgkg",
+        "vitamin_b6_mgkg",
+        "vitamin_b12_mgkg",
+        "niacin_mgkg",
+        "pantothenic_acid_mgkg",
+        "folic_acid_mgkg",
+        "biotin_mgkg",
+        "choline_mgkg",
+        "vitamin_c_mgkg",
+        "vitamin_k3_mgkg",
+
+        # Energia
         "metabolizable_energy_kcalkg",
+
+        # Outros
+        "beta_glucans_mgkg",
+        "mos_mgkg",
     )
 
     def __init__(

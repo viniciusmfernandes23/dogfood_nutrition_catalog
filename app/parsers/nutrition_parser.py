@@ -65,6 +65,10 @@ def parse_value(
                 unit = "g/kg"
             elif unit in ["mg/kg", "mg / kg", "mg.kg"]:
                 unit = "mg/kg"
+            elif unit in ["ui/kg", "ui / kg", "ui.kg", "ui", "u.i.", "u.i"]:
+                unit = "ui/kg"
+            elif unit in ["mcg", "ug"]:
+                unit = "mcg"
             elif unit and ("kcal" in unit and "100" in unit):
                 unit = "kcal/100g"
             elif unit in ["kcal/kg", "kcal / kg", "kcal.kg", "kcal", "cal/kg", "cal"]:
@@ -111,16 +115,22 @@ def parse_nutrition(
             boundary = r"\b" if (len(alias) <= 2 and re.match(r"^\w+$", alias)) else ""
             
             # v1.3.13: Se o alias já contém escape de regex (como \(mín\)), usamos como está.
-            # Caso contrário, escapamos caracteres especiais.
+            # Caso contrário, escapamos caracteres especiais, mas permitimos '.' literal para abreviações.
             if "\\" in alias or "(" in alias or ")" in alias:
                 pattern_str = alias
+            elif "." in alias:
+                # Escapa tudo exceto o ponto
+                pattern_str = re.escape(alias).replace(r"\.", r"\.?")
             else:
                 pattern_str = re.escape(alias)
                 
+            # Regex de número que aceita separadores de milhar (10.530,00)
+            NUMBER_EXT = r"(\d+(?:[.,]\d+)*(?:[.,]\d+)?)"
             pattern = re.compile(
                 rf"{boundary}{pattern_str}{boundary}"
+                rf"[:\s]*" 
                 rf"{SEPARATOR}"
-                rf"{NUMBER}"
+                rf"{NUMBER_EXT}"
                 rf"\s*"
                 rf"{UNIT}",
                 FLAGS,
@@ -147,10 +157,14 @@ def parse_nutrition(
                     
                     if unit in ["%", "por cento", "porcentagem"]:
                         unit = "%"
-                    elif unit in ["g/kg", "g / kg", "g.kg"]:
+                    elif unit in ["g/kg", "g / kg", "g.kg", "g"]:
                         unit = "g/kg"
-                    elif unit in ["mg/kg", "mg / kg", "mg.kg"]:
+                    elif unit in ["mg/kg", "mg / kg", "mg.kg", "mg"]:
                         unit = "mg/kg"
+                    elif unit in ["ui/kg", "ui / kg", "ui.kg", "ui", "u.i.", "u.i"]:
+                        unit = "ui/kg"
+                    elif unit in ["mcg", "ug"]:
+                        unit = "mcg"
                     elif unit and ("kcal" in unit and "100" in unit):
                         unit = "kcal/100g"
                     elif unit in ["kcal/kg", "kcal / kg", "kcal.kg", "kcal", "cal/kg", "cal"]:

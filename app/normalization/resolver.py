@@ -99,7 +99,7 @@ class Resolver:
                 # Validação Biológica Final (500-9000 kcal/kg)
                 if 500 <= converted_value <= 9000:
                     nutrient.original_value = nutrient.value
-                    nutrient.value = round(float(converted_value), 2)
+                    nutrient.value = round(float(converted_value), 5)
                     nutrient.status = ValidationStatus.NORMALIZED
                     nutrient.rule_applied = f"unit_conv_{rule_name}"
                     nutrient.confidence = 1.0
@@ -130,7 +130,7 @@ class Resolver:
 
             if converted_value is not None:
                 nutrient.original_value = nutrient.value
-                nutrient.value = round(float(converted_value), 2)
+                nutrient.value = round(float(converted_value), 5)
                 nutrient.status = ValidationStatus.AUTO_CORRECTED
                 nutrient.rule_applied = f"unit_direct_{rule_name}"
                 nutrient.confidence = 1.0
@@ -143,7 +143,7 @@ class Resolver:
         if self.validator.has_single_candidate(candidates):
             value, applied_rule = candidates[0]
             nutrient.original_value = nutrient.value
-            nutrient.value = round(float(value), 2)
+            nutrient.value = round(float(value), 5)
             nutrient.status = ValidationStatus.AUTO_CORRECTED
             nutrient.rule_applied = applied_rule
             nutrient.confidence = get_confidence(applied_rule)
@@ -257,6 +257,13 @@ class Resolver:
                 return value, "already_mgkg"
             return value / GKG_TO_MGKG_FACTOR, "mgkg_to_gkg"
             
+        if unit == "ui/kg":
+            return value, "already_uikg"
+
+        if unit == "mcg":
+            # 1 mcg = 0.001 mg
+            return value * 0.001, "mcg_to_mgkg"
+
         return None, None
 
     def _build_candidates(
