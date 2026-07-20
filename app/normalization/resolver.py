@@ -66,13 +66,18 @@ class Resolver:
         if rule is None:
             return nutrient
 
-        # 1. Se o valor já está no range e parece plausível, aceitamos IMEDIATAMENTE.
-        # Isso evita re-normalização de valores que já estão corretos (ex: 1700 mg/kg ou 3500 kcal/kg).
+        # 1. Se o valor já está no range e parece plausível, aceitamos IMEDIATAMENTE,
+        # A MENOS QUE haja uma unidade original explícita que exija conversão 
+        # (ex: kcal/100g ou MJ/kg para energia).
         if self.validator.is_valid(nutrient.value, rule):
-            nutrient.status = ValidationStatus.NORMALIZED
-            nutrient.rule_applied = "already_normalized"
-            nutrient.confidence = get_confidence("already_normalized")
-            return nutrient
+            # Se a unidade original for uma que exige conversão, ignoramos o 
+            # status de 'already_normalized' e prosseguimos para a conversão.
+            norm_unit = str(nutrient.original_unit).lower().strip() if nutrient.original_unit else None
+            if norm_unit not in ["kcal/100g", "mj/kg"]:
+                nutrient.status = ValidationStatus.NORMALIZED
+                nutrient.rule_applied = "already_normalized"
+                nutrient.confidence = get_confidence("already_normalized")
+                return nutrient
 
         # 2. Prioridade: Unidade original detectada pelo parser
         if nutrient.original_unit:
@@ -94,7 +99,11 @@ class Resolver:
                 nutrient.confidence = 0.0
                 return nutrient
 
-            if converted_value is not None and self.validator.is_valid(converted_value, rule):
+            if converted_value is not None:
+                # Se a conversão veio de uma unidade explícita, nós aceitamos o
+                # valor mesmo que ele exceda o range normal da regra, pois a
+                # unidade original é soberana. O warehouse cuidará de anular se
+                # exceder o limite físico absoluto (ex: 9000 kcal/kg para energia).
                 nutrient.original_value = nutrient.value
                 nutrient.value = round(float(converted_value), 2)
                 nutrient.status = ValidationStatus.AUTO_CORRECTED

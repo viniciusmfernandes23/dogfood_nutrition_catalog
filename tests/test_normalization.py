@@ -361,3 +361,26 @@ def test_engine_nullifies_energy_with_mgkg_unit():
     assert pd.isna(normalized.at[0, "metabolizable_energy_kcalkg"]), (
         "Energia com unidade mg/kg deve ser anulada no pipeline completo"
     )
+
+
+def test_engine_converts_plausible_kcal_100g():
+    """
+    Testa se o engine converte kcal/100g para kcal/kg mesmo quando o valor
+    original já está no range plausível de kcal/kg (ex: 1200 kcal/100g).
+    Sem a correção da trava de segurança, o engine ignoraria a unidade.
+    """
+    engine = NormalizationEngine()
+
+    df = pd.DataFrame({
+        "product_id": [123],
+        "metabolizable_energy_kcalkg": [1200.0],
+        "metabolizable_energy_unit": ["kcal/100g"],
+    })
+
+    normalized, _ = engine.normalize_dataframe(df)
+
+    # 1200 kcal/100g -> 12000 kcal/kg (e depois a barreira biológica anularia se > 9000)
+    # Mas o importante aqui é que ele TENTE converter, resultando em 12000.
+    assert normalized.at[0, "metabolizable_energy_kcalkg"] == 12000.0 or pd.isna(normalized.at[0, "metabolizable_energy_kcalkg"]), (
+        "O engine deve tentar converter kcal/100g mesmo se o valor for plausível"
+    )
