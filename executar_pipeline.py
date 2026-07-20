@@ -200,10 +200,16 @@ def run_extraction():
                     priority = 2 if any(x in alias for x in ['mín', 'min', 'máx', 'max']) else 1
                     
                     if target_col not in best_matches or priority > best_matches[target_col]['priority']:
-                        best_matches[target_col] = {'value': val_real, 'priority': priority}
+                        best_matches[target_col] = {'value': val_real, 'unit': nut_data.get('unit'), 'priority': priority}
                 
                 for col, data in best_matches.items():
                     full_df.at[index, col] = data['value']
+                    # Persiste a unidade original para que a barreira biológica
+                    # do NormalizationEngine possa validar a unidade no resolver.
+                    unit_col = f"{col}_unit"
+                    if unit_col not in full_df.columns:
+                        full_df[unit_col] = None
+                    full_df.at[index, unit_col] = data.get('unit')
 
         # 4. Executar Orquestrador
         print("Finalizando processamento no Warehouse...")

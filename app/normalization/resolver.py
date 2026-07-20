@@ -81,6 +81,19 @@ class Resolver:
                 nutrient.original_unit, 
                 rule
             )
+
+            # Barreira biológica: unidade explicitamente incompatível com o
+            # nutriente (ex.: mg/kg para energia metabolizável). Anulamos o
+            # valor imediatamente, sem tentar fallback heurístico, pois a
+            # unidade errada indica erro de cadastro/crawler na origem.
+            if rule_name == "invalid_energy_unit":
+                nutrient.original_value = nutrient.value
+                nutrient.value = None
+                nutrient.status = ValidationStatus.IMPLAUSIBLE
+                nutrient.rule_applied = "invalid_energy_unit"
+                nutrient.confidence = 0.0
+                return nutrient
+
             if converted_value is not None and self.validator.is_valid(converted_value, rule):
                 nutrient.original_value = nutrient.value
                 nutrient.value = round(float(converted_value), 2)
@@ -169,7 +182,32 @@ class Resolver:
         rule: NormalizationRule
     ) -> tuple[float | None, str | None]:
         target_is_mgkg = rule.field.endswith("_mgkg")
-        
+        target_is_kcalkg = rule.field.endswith("_kcalkg")
+
+        # ------------------------------------------------------------------
+        # Barreira biológica: energia metabolizável só aceita unidades de
+        # energia (kcal/kg, kcal/100g, MJ/kg). Qualquer outra unidade
+        # (ex.: mg/kg, g/kg, %) é fisicamente impossível para energia e
+        # deve ser marcada como inválida (retorna None).
+        # ------------------------------------------------------------------
+        if target_is_kcalkg:
+            if unit == "kcal/kg":
+                return value, "already_kcalkg"
+            elif unit == "kcal/100g":
+                # 1 kcal/100g == 10 kcal/kg
+                return round(value * 10.0, 2), "kcal100g_to_kcalkg"
+            elif unit == "mj/kg":
+                # 1 MJ/kg == 239.006 kcal/kg
+                return round(value * 239.006, 2), "mjkg_to_kcalkg"
+            else:
+                # Unidade incompatível com energia (ex.: mg/kg, g/kg, %)
+                print(
+                    f"[BIOLOGICAL BARRIER] Unidade inválida para energia "
+                    f"metabolizável: '{unit}' (valor={value}). "
+                    f"Esperado: kcal/kg, kcal/100g ou MJ/kg. Anulando."
+                )
+                return None, "invalid_energy_unit"
+
         if unit == "%":
             if target_is_mgkg:
                 return value * PERCENT_TO_MGKG_FACTOR, "percent_to_mgkg"
@@ -184,10 +222,6 @@ class Resolver:
             if target_is_mgkg:
                 return value, "already_mgkg"
             return value / GKG_TO_MGKG_FACTOR, "mgkg_to_gkg"
-            
-        if unit == "kcal/kg":
-            if rule.field.endswith("_kcalkg"):
-                return value, "already_kcalkg"
             
         return None, None
 

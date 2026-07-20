@@ -272,3 +272,92 @@ def test_biological_audit_regression():
     assert pd.isna(normalized_df.at[3, "protein_gkg"])
     # Sodium também deve ser anulado se a proteína for invalidada
     assert pd.isna(normalized_df.at[3, "sodium_mgkg"])
+
+
+# =============================================================================
+# Testes de Regressão: Barreira Biológica de Unidade de Energia Metabolizável
+# Ref: Bug Biofresh Cães Sênior Raças Grandes — valor 300 mg/kg para energia
+# =============================================================================
+
+def test_resolver_rejects_mgkg_for_metabolizable_energy():
+    """
+    Energia metabolizável com unidade mg/kg deve ser anulada (None).
+    Caso concreto: Biofresh Sênior Raças Grandes — 300 mg/kg é fisicamente
+    impossível para energia; a unidade correta seria kcal/kg.
+    """
+    rule = get_rule("metabolizable_energy_kcalkg")
+    nutrient = NormalizedNutrient(
+        name="metabolizable_energy_kcalkg",
+        value=300,
+        unit="kcal/kg",
+        original_unit="mg/kg",
+    )
+
+    resolved = Resolver().resolve(nutrient, rule=rule)
+
+    assert resolved.value is None, (
+        "Energia em mg/kg deve ser anulada pela barreira biológica"
+    )
+
+
+def test_resolver_accepts_kcal_per_100g_for_metabolizable_energy():
+    """
+    Energia metabolizável em kcal/100g deve ser convertida para kcal/kg
+    multiplicando por 10. Ex.: 350 kcal/100g -> 3500 kcal/kg.
+    """
+    rule = get_rule("metabolizable_energy_kcalkg")
+    nutrient = NormalizedNutrient(
+        name="metabolizable_energy_kcalkg",
+        value=350,
+        unit="kcal/kg",
+        original_unit="kcal/100g",
+    )
+
+    resolved = Resolver().resolve(nutrient, rule=rule)
+
+    assert resolved.value == 3500.0, (
+        "350 kcal/100g deve ser convertido para 3500 kcal/kg"
+    )
+
+
+def test_resolver_accepts_mjkg_for_metabolizable_energy():
+    """
+    Energia metabolizável em MJ/kg deve ser convertida para kcal/kg
+    multiplicando por 239.006. Ex.: 14.6 MJ/kg -> ~3489.49 kcal/kg.
+    """
+    rule = get_rule("metabolizable_energy_kcalkg")
+    nutrient = NormalizedNutrient(
+        name="metabolizable_energy_kcalkg",
+        value=14.6,
+        unit="kcal/kg",
+        original_unit="mj/kg",
+    )
+
+    resolved = Resolver().resolve(nutrient, rule=rule)
+
+    assert resolved.value is not None, (
+        "Energia em MJ/kg deve ser convertida, não anulada"
+    )
+    assert abs(resolved.value - 3489.49) < 1.0, (
+        f"14.6 MJ/kg deve ser ~3489.49 kcal/kg, obtido {resolved.value}"
+    )
+
+
+def test_engine_nullifies_energy_with_mgkg_unit():
+    """
+    Teste de ponta a ponta: o engine deve anular a energia metabolizável
+    quando a coluna de unidade indica mg/kg (caso Biofresh).
+    """
+    engine = NormalizationEngine()
+
+    df = pd.DataFrame({
+        "product_id": [999],
+        "metabolizable_energy_kcalkg": [300.0],
+        "metabolizable_energy_unit": ["mg/kg"],
+    })
+
+    normalized, _ = engine.normalize_dataframe(df)
+
+    assert pd.isna(normalized.at[0, "metabolizable_energy_kcalkg"]), (
+        "Energia com unidade mg/kg deve ser anulada no pipeline completo"
+    )
