@@ -379,8 +379,25 @@ def test_engine_converts_plausible_kcal_100g():
 
     normalized, _ = engine.normalize_dataframe(df)
 
-    # 1200 kcal/100g -> 12000 kcal/kg (e depois a barreira biológica anularia se > 9000)
-    # Mas o importante aqui é que ele TENTE converter, resultando em 12000.
-    assert normalized.at[0, "metabolizable_energy_kcalkg"] == 12000.0 or pd.isna(normalized.at[0, "metabolizable_energy_kcalkg"]), (
-        "O engine deve tentar converter kcal/100g mesmo se o valor for plausível"
+    # 1200 kcal/100g -> 12000 kcal/kg
+    # Como 12000 > 9000 (limite biológico), o resolver deve anular o valor
+    # com a regra 'biologically_implausible_energy'.
+    assert pd.isna(normalized.at[0, "metabolizable_energy_kcalkg"]), (
+        "O engine deve anular energia que excede 9000 kcal/kg após conversão"
+    )
+
+def test_engine_nullifies_energy_without_unit():
+    """
+    Testa se o engine anula energia metabolizável quando não há unidade,
+    seguindo a nova abordagem determinística.
+    """
+    engine = NormalizationEngine()
+    df = pd.DataFrame({
+        "product_id": [456],
+        "metabolizable_energy_kcalkg": [3500.0],
+        # Sem coluna de unidade
+    })
+    normalized, _ = engine.normalize_dataframe(df)
+    assert pd.isna(normalized.at[0, "metabolizable_energy_kcalkg"]), (
+        "Energia sem unidade deve ser anulada por ser indeterminística"
     )

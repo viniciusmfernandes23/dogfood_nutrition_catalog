@@ -276,7 +276,7 @@ class WarehouseExporter:
         sanity_checks = [
             ((df["nutrient_name"].isin(macro_fields)) & (df["nutrient_value"] > 1000), "macro_exceeds_1000gkg"),
             ((df["nutrient_name"] == "metabolizable_energy_kcalkg") & (df["nutrient_value"] > 9000), "energy_exceeds_9000kcalkg"),
-            ((df["nutrient_name"] == "metabolizable_energy_kcalkg") & (df["nutrient_value"] < 100), "energy_below_100kcalkg"),
+            ((df["nutrient_name"] == "metabolizable_energy_kcalkg") & (df["nutrient_value"] < 500), "energy_below_500kcalkg"),
             ((df["nutrient_name"].isin(mineral_fields)) & (df["nutrient_value"] > 60000), "mineral_toxicity_limit"),
             ((df["nutrient_name"].isin(mineral_fields)) & (df["nutrient_value"] < 1), "mineral_insignificant_limit")
         ]

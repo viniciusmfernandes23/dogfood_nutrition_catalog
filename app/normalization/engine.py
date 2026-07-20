@@ -76,15 +76,10 @@ class NormalizationEngine:
             
             # Trava de Segurança: Se o valor já estiver no range plausível, 
             # ignoramos a unidade original para evitar re-multiplicação indevida.
+            # NOTA: O Resolver agora lida com a exceção de energia metabolizável 
+            # de forma determinística, então aqui apenas mantemos a lógica geral.
             if pd.notna(current_value) and rule.target_min <= current_value <= rule.target_max:
-                # EXCEÇÃO: Energia metabolizável sempre deve respeitar a unidade kcal/100g ou MJ/kg
-                # para garantir a conversão correta para kcal/kg, mesmo que o valor original
-                # caia acidentalmente no range (ex: 1200 kcal/100g -> 12000 kcal/kg).
-                norm_unit = str(original_unit).lower().strip() if original_unit else None
-                if "metabolizable_energy" in field and norm_unit in ["kcal/100g", "mj/kg"]:
-                    pass # Mantém a unidade para conversão
-                else:
-                    original_unit = None
+                original_unit = None
 
             result = self.resolver.resolve_value(
                 value=current_value,
