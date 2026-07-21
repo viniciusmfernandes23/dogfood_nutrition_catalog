@@ -29,7 +29,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     "protein_gkg": NormalizationRule(
         field="protein_gkg",
         target_min=60,
-        target_max=600,
+        target_max=1000,
         overscale_factor=10,
         decimal_shift_factor=10,
         percent_factor=PERCENT_TO_GKG_FACTOR,
@@ -38,7 +38,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     "fat_gkg": NormalizationRule(
         field="fat_gkg",
         target_min=20,
-        target_max=400,
+        target_max=1000,
         overscale_factor=10,
         decimal_shift_factor=10,
         percent_factor=PERCENT_TO_GKG_FACTOR,
@@ -47,7 +47,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     "fiber_gkg": NormalizationRule(
         field="fiber_gkg",
         target_min=5,
-        target_max=250,
+        target_max=1000,
         overscale_factor=10,
         decimal_shift_factor=10,
         percent_factor=PERCENT_TO_GKG_FACTOR,
@@ -56,7 +56,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     "ash_gkg": NormalizationRule(
         field="ash_gkg",
         target_min=10,
-        target_max=200,
+        target_max=1000,
         overscale_factor=10,
         decimal_shift_factor=10,
         percent_factor=PERCENT_TO_GKG_FACTOR,
@@ -65,7 +65,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     "moisture_gkg": NormalizationRule(
         field="moisture_gkg",
         target_min=60,
-        target_max=950,
+        target_max=1000,
         overscale_factor=10,
         decimal_shift_factor=10,
         percent_factor=PERCENT_TO_GKG_FACTOR,
@@ -137,7 +137,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     "metabolizable_energy_kcalkg": NormalizationRule(
         field="metabolizable_energy_kcalkg",
         target_min=500,
-        target_max=6500,
+        target_max=9000,
         overscale_factor=10,
         decimal_shift_factor=1000,
         percent_factor=10000,
@@ -220,7 +220,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     "magnesium_mgkg": NormalizationRule(
         field="magnesium_mgkg",
         target_min=100,
-        target_max=5000,
+        target_max=2000,
         percent_factor=PERCENT_TO_MGKG_FACTOR,
         gkg_to_mgkg=True,
     ),
@@ -240,19 +240,19 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     "zinc_mgkg": NormalizationRule(
         field="zinc_mgkg",
         target_min=50,
-        target_max=1000,
+        target_max=500,
         decimal_shift_up=1,
     ),
     "copper_mgkg": NormalizationRule(
         field="copper_mgkg",
         target_min=2,
-        target_max=200,
+        target_max=100,
         decimal_shift_up=1,
     ),
     "selenium_mgkg": NormalizationRule(
         field="selenium_mgkg",
         target_min=0.05,
-        target_max=10,
+        target_max=5,
         decimal_shift_up=1,
     ),
     "iodine_mgkg": NormalizationRule(
@@ -264,7 +264,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     "manganese_mgkg": NormalizationRule(
         field="manganese_mgkg",
         target_min=2,
-        target_max=200,
+        target_max=100,
         decimal_shift_up=1,
     ),
 
@@ -334,7 +334,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     "biotin_mgkg": NormalizationRule(
         field="biotin_mgkg",
         target_min=0.01,
-        target_max=5,
+        target_max=2,
         decimal_shift_up=1,
     ),
     "choline_mgkg": NormalizationRule(

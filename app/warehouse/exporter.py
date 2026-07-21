@@ -174,10 +174,9 @@ class WarehouseExporter:
             / filename
         )
 
-        # Se o DataFrame estiver vazio, garantimos que o arquivo exista (mesmo vazio) para evitar erros em scripts externos
+        # Se o DataFrame estiver vazio, garantimos que o arquivo exista (mesmo vazio)
         if dataframe is None or dataframe.empty:
             if not output_file.exists():
-                # Cria um arquivo vazio com cabeçalhos padrão baseados no nome do arquivo
                 headers = ["product_id"]
                 if "fact_nutrient" in filename:
                     headers = [
@@ -198,56 +197,43 @@ class WarehouseExporter:
                 pd.DataFrame(columns=headers).to_csv(output_file, index=False, encoding="utf-8-sig")
             return output_file
 
-        # Barreira de Sanidade Final (v1.3.2): Validação biológica obrigatória antes da escrita
+        # Barreira de Sanidade Final
         if filename == "fact_nutrient.csv" and "nutrient_value" in dataframe.columns:
             self._apply_final_biological_sanity_check(dataframe)
             
+            # Prioridade 6: O Power BI não deve realizar correções. Receber apenas dados já consistentes.
             # Aplica a Camada Semântica orientada por metadados
-            # Converte da escala técnica interna para a escala de negócio real
             dataframe = SemanticLayer.apply_output_conversion(dataframe)
 
         if filename == "fact_price_snapshot.csv":
             for price_col in ("price", "list_price", "subscriber_price", "price_per_kg"):
                 if price_col in dataframe.columns:
-                    # Converte para numérico e arredonda apenas valores válidos
                     dataframe[price_col] = pd.to_numeric(dataframe[price_col], errors='coerce').round(2)
 
-        # Se for append e o arquivo já existir, carregamos o existente para evitar duplicatas
         if append and output_file.exists():
             try:
-                # Carrega o arquivo existente
                 existing_df = pd.read_csv(output_file, encoding="utf-8-sig")
                 
-                # Garante tipos consistentes para detecção de duplicatas
-                for col in ["product_id", "collected_at", "nutrient_name", "sku_id", "marketplace", "ean"]:
+                for col in ["product_id", "collected_at", "nutrient_key", "sku_id", "marketplace", "ean"]:
                     if col in existing_df.columns:
                         existing_df[col] = existing_df[col].astype(str)
                     if col in dataframe.columns:
                         dataframe[col] = dataframe[col].astype(str)
 
-                # Concatenamos
                 combined_df = pd.concat([existing_df, dataframe], ignore_index=True)
                 
-                # Identifica colunas para detecção de duplicatas
                 subset = ["product_id"]
                 if "collected_at" in combined_df.columns:
                     subset.append("collected_at")
-                if "nutrient_name" in combined_df.columns:
-                    subset.append("nutrient_name")
+                if "nutrient_key" in combined_df.columns:
+                    subset.append("nutrient_key")
                 
-                # Garantir que collected_at seja datetime para ordenação correta
                 if "collected_at" in combined_df.columns:
                     combined_df["collected_at_dt"] = pd.to_datetime(combined_df["collected_at"])
-                    # Ordena por data para que 'last' seja realmente o mais recente
                     combined_df = combined_df.sort_values(by="collected_at_dt")
                 
-                # Ajuste: No caso de fact_price_snapshot, a deduplicação deve usar
-                # product_id + sku_id + data para preservar múltiplas variações do
-                # mesmo produto coletadas no mesmo dia (ex: embalagens de 10kg, 15kg, 20kg).
                 if filename == "fact_price_snapshot.csv" and "collected_at" in combined_df.columns:
-                    # Cria coluna temporária apenas com a data para deduplicação
                     combined_df["_date_only"] = combined_df["collected_at_dt"].dt.date
-                    # Inclui sku_id e marketplace na chave de deduplicação para preservar variações distintas
                     price_subset = ["product_id", "_date_only"]
                     if "sku_id" in combined_df.columns:
                         price_subset.append("sku_id")
@@ -256,7 +242,6 @@ class WarehouseExporter:
                     combined_df = combined_df.drop_duplicates(subset=price_subset, keep='last')
                     combined_df = combined_df.drop(columns=["_date_only"])
                 else:
-                    # Remove duplicatas (mantém a versão mais recente se houver conflito no mesmo timestamp)
                     combined_df = combined_df.drop_duplicates(subset=subset, keep='last')
                 
                 if "collected_at_dt" in combined_df.columns:
@@ -276,21 +261,22 @@ class WarehouseExporter:
 
     def _apply_final_biological_sanity_check(self, df: pd.DataFrame) -> None:
         """
-        Aplica as 5 regras de ouro biológicas como filtro final obrigatório no DataFrame de exportação.
+        Aplica as regras de ouro biológicas como filtro final obrigatório.
         """
-        if "nutrient_name" not in df.columns or "nutrient_value" not in df.columns:
+        # Alinhado para usar nutrient_key conforme fact_nutrient.py
+        if "nutrient_key" not in df.columns or "nutrient_value" not in df.columns:
             return
 
-        # 1. Trava de Limites Absolutos (Física da Matéria Orgânica)
+        # 1. Trava de Limites Absolutos
         macro_fields = ["protein_gkg", "fat_gkg", "fiber_gkg", "ash_gkg", "moisture_gkg"]
         mineral_fields = ["sodium_mgkg", "potassium_mgkg", "calcium_min_mgkg", "calcium_max_mgkg", "phosphorus_mgkg"]
         
         sanity_checks = [
-            ((df["nutrient_name"].isin(macro_fields)) & (df["nutrient_value"] > 1000), "macro_exceeds_1000gkg"),
-            ((df["nutrient_name"] == "metabolizable_energy_kcalkg") & (df["nutrient_value"] > 9000), "energy_exceeds_9000kcalkg"),
-            ((df["nutrient_name"] == "metabolizable_energy_kcalkg") & (df["nutrient_value"] < 500), "energy_below_500kcalkg"),
-            ((df["nutrient_name"].isin(mineral_fields)) & (df["nutrient_value"] > 60000), "mineral_toxicity_limit"),
-            ((df["nutrient_name"].isin(mineral_fields)) & (df["nutrient_value"] < 1), "mineral_insignificant_limit")
+            ((df["nutrient_key"].isin(macro_fields)) & (df["nutrient_value"] > 1000), "macro_exceeds_1000gkg"),
+            ((df["nutrient_key"] == "metabolizable_energy_kcalkg") & (df["nutrient_value"] > 9000), "energy_exceeds_9000kcalkg"),
+            ((df["nutrient_key"] == "metabolizable_energy_kcalkg") & (df["nutrient_value"] < 500), "energy_below_500kcalkg"),
+            ((df["nutrient_key"].isin(mineral_fields)) & (df["nutrient_value"] > 60000), "mineral_toxicity_limit"),
+            ((df["nutrient_key"].isin(mineral_fields)) & (df["nutrient_value"] < 1), "mineral_insignificant_limit")
         ]
 
         for mask, reason in sanity_checks:
@@ -299,7 +285,7 @@ class WarehouseExporter:
                 for idx in extreme_indices:
                     self.sanity_logs.append({
                         "product_id": df.at[idx, "product_id"],
-                        "field": df.at[idx, "nutrient_name"],
+                        "field": df.at[idx, "nutrient_key"],
                         "original_value": df.at[idx, "nutrient_value"],
                         "action": "nullified",
                         "reason": reason,
@@ -308,130 +294,28 @@ class WarehouseExporter:
                 print(f"[FINAL SANITY BARRIER] Anulando {len(extreme_indices)} valores por {reason}.")
                 df.loc[mask, "nutrient_value"] = None
 
-        # 2. Âncora de Umidade vs Energia (Rações Úmidas)
-        for product_id in df["product_id"].unique():
-            prod_mask = df["product_id"] == product_id
-            moisture_row = df[prod_mask & (df["nutrient_name"] == "moisture_gkg")]
-            energy_row = df[prod_mask & (df["nutrient_name"] == "metabolizable_energy_kcalkg")]
-            
-            if not moisture_row.empty and not energy_row.empty:
-                moisture = moisture_row["nutrient_value"].values[0]
-                energy = energy_row["nutrient_value"].values[0]
-                
-                if pd.notna(moisture) and pd.notna(energy):
-                    if moisture > 700 and energy > 1500:
-                        action = "nullified" if energy > 6000 else "corrected_10x"
-                        new_val = None if energy > 6000 else round(energy / 10.0, 2)
-                        
-                        self.sanity_logs.append({
-                            "product_id": product_id,
-                            "field": "metabolizable_energy_kcalkg",
-                            "original_value": energy,
-                            "action": action,
-                            "reason": "moisture_energy_inconsistency",
-                            "timestamp": datetime.now().isoformat()
-                        })
-                        
-                        print(f"[FINAL SANITY BARRIER] {action.capitalize()} Energia incompatível com Umidade para produto {product_id}")
-                        df.loc[prod_mask & (df["nutrient_key"] == "metabolizable_energy_kcalkg"), "nutrient_value"] = new_val
-
-        # 3. Validação de Soma de Macronutrientes por Produto
-        for product_id in df["product_id"].unique():
-            prod_mask = df["product_id"] == product_id
-            macros_present = df[prod_mask & (df["nutrient_key"].isin(macro_fields))]
-            
-            if not macros_present.empty:
-                total_sum = macros_present["nutrient_value"].sum()
-                if total_sum > 1050:
-                    for idx in macros_present.index:
-                        self.sanity_logs.append({
-                            "product_id": product_id,
-                            "field": df.at[idx, "nutrient_key"],
-                            "original_value": df.at[idx, "nutrient_value"],
-                            "action": "nullified",
-                            "reason": f"macro_sum_exceeded_{int(total_sum)}",
-                            "timestamp": datetime.now().isoformat()
-                        })
-                    
-                    energy_row = df[prod_mask & (df["nutrient_key"] == "metabolizable_energy_kcalkg")]
-                    if not energy_row.empty:
-                        self.sanity_logs.append({
-                            "product_id": product_id,
-                            "field": "metabolizable_energy_kcalkg",
-                            "original_value": energy_row["nutrient_value"].values[0],
-                            "action": "nullified",
-                            "reason": "macro_sum_inconsistency",
-                            "timestamp": datetime.now().isoformat()
-                        })
-
-                    print(f"[FINAL SANITY BARRIER] Soma de macros impossível ({total_sum}g/kg) no produto {product_id}. Anulando nutrientes.")
-                    df.loc[prod_mask & (df["nutrient_key"].isin(macro_fields)), "nutrient_value"] = None
-                    df.loc[prod_mask & (df["nutrient_key"] == "metabolizable_energy_kcalkg"), "nutrient_value"] = None
-
-    # ==========================================================
-    # Helpers
-    # ==========================================================
-
-    @staticmethod
-    def _count_rows(
-        file_path: Path,
-    ) -> int:
-
-        if not file_path.exists():
+    def _count_rows(self, path: Path) -> int:
+        if not path.exists():
             return 0
-
         try:
-            return len(
-                pd.read_csv(
-                    file_path,
-                    low_memory=False,
-                )
-            )
+            return len(pd.read_csv(path))
         except Exception:
             return 0
 
-    def clean_output_directory(
-        self,
-        full_clean: bool = False,
-    ) -> None:
-        """
-        Limpa o diretório de saída.
-        Se full_clean=True, remove tudo para uma nova execução completa.
-        Caso contrário (incremental), preserva os arquivos existentes do Data Warehouse.
-        """
+    def clean_output_directory(self, full_clean: bool = False) -> None:
         if full_clean:
-            for file in self.output_dir.iterdir():
-                if file.is_file():
-                    file.unlink()
+            for f in self.output_dir.glob("*.csv"):
+                f.unlink()
+            for f in self.output_dir.glob("*.json"):
+                f.unlink()
         else:
-            print("[WAREHOUSE] Modo incremental: Preservando arquivos existentes no diretório de saída.")
+            # Mantém histórico de preços se não for full_clean
+            for f in self.output_dir.glob("*.csv"):
+                if f.name != "fact_price_snapshot.csv":
+                    f.unlink()
 
-    def file_exists(
-        self,
-        filename: str,
-    ) -> bool:
+    def list_exported_files(self) -> list[Path]:
+        return list(self.output_dir.glob("*.csv"))
 
-        return (
-            self.output_dir
-            / filename
-        ).exists()
-
-    def list_exported_files(
-        self,
-    ) -> list[Path]:
-
-        return sorted(
-            self.output_dir.glob(
-                "*.csv",
-            )
-        )
-
-    def list_metadata_files(
-        self,
-    ) -> list[Path]:
-
-        return sorted(
-            self.output_dir.glob(
-                "*.json",
-            )
-        )
+    def file_exists(self, filename: str) -> bool:
+        return (self.output_dir / filename).exists()

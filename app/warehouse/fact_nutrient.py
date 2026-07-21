@@ -129,6 +129,7 @@ class NutrientFactBuilder:
                     original_unit=row.get(f"{nutrient}_unit"),
                     status=row.get(f"{nutrient}_status"),
                     rule_applied=row.get(f"{nutrient}_rule"),
+                    reason=row.get(f"{nutrient}_reason"),
                     collected_at=self.timestamp,
                 )
 

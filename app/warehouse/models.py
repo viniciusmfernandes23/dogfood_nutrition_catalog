@@ -79,6 +79,7 @@ class NutrientFact(WarehouseModel):
     
     status: str | None           # Status de normalização (Normalizado, Corrigido, Implausível)
     rule_applied: str | None     # Regra técnica aplicada
+    reason: str | None = None    # Motivo da invalidação ou correção
     
     collected_at: datetime
 

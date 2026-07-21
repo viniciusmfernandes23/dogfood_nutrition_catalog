@@ -30,11 +30,21 @@ class Resolver:
         rule: NormalizationRule | None = None,
     ) -> NormalizedNutrient:
 
-
         if nutrient.value is None:
             nutrient.status = ValidationStatus.MISSING
             nutrient.confidence = 0.0
             return nutrient
+
+        # Prioridade 1.1: Validar percentuais antes da conversão
+        if nutrient.original_unit == "%":
+            if nutrient.value < 0 or nutrient.value > 100:
+                print(f"[AUDIT] Valor percentual implausível: {nutrient.value}%")
+                nutrient.original_value = nutrient.value
+                nutrient.value = None
+                nutrient.status = ValidationStatus.BIOLOGICALLY_IMPLAUSIBLE_SOURCE
+                nutrient.rule_applied = "invalid_percent_range"
+                nutrient.confidence = 0.0
+                return nutrient
 
         # Proteção e Auto-Correção de valores astronômicos
         # Se o valor for > 100.000, provavelmente sofreu múltiplas multiplicações indevidas
@@ -69,11 +79,8 @@ class Resolver:
         target_is_kcalkg = rule.field.endswith("_kcalkg")
 
         # 1. Fluxo Determinístico para Energia Metabolizável
-        # Baseado na recomendação técnica: Unidade -> Conversão -> Validação Biológica
         if target_is_kcalkg:
             if not nutrient.original_unit:
-                # Sem unidade, não temos como garantir a escala (pode ser kcal/g, kcal/100g, kcal/kg)
-                # Seguindo a filosofia de preferir anular a produzir valor incerto.
                 nutrient.original_value = nutrient.value
                 nutrient.value = None
                 nutrient.status = ValidationStatus.IMPLAUSIBLE
@@ -96,7 +103,7 @@ class Resolver:
                 return nutrient
 
             if converted_value is not None:
-                # Validação Biológica Final (500-9000 kcal/kg)
+                # Prioridade 1.3: Validar Energia Metabolizável APÓS conversão (500-9000 kcal/kg)
                 if 500 <= converted_value <= 9000:
                     nutrient.original_value = nutrient.value
                     nutrient.value = round(float(converted_value), 5)
@@ -104,23 +111,22 @@ class Resolver:
                     nutrient.rule_applied = f"unit_conv_{rule_name}"
                     nutrient.confidence = 1.0
                 else:
-                    # Valor fisicamente impossível mesmo após conversão
                     nutrient.original_value = nutrient.value
                     nutrient.value = None
-                    nutrient.status = ValidationStatus.IMPLAUSIBLE
+                    nutrient.status = ValidationStatus.BIOLOGICALLY_IMPLAUSIBLE_ENERGY
                     nutrient.rule_applied = "biologically_implausible_energy"
                     nutrient.confidence = 0.0
                 return nutrient
 
-        # 2. Fluxo Padrão para outros nutrientes (Macronutrientes, Minerais, Vitaminas)
-        # Se o valor já está no range e parece plausível, aceitamos IMEDIATAMENTE.
+        # 2. Fluxo Padrão para outros nutrientes
+        # Mesmo que venha marcado como already_normalized, deve passar pelas barreiras sanitárias (Prioridade 3.2)
         if self.validator.is_valid(nutrient.value, rule):
             nutrient.status = ValidationStatus.NORMALIZED
             nutrient.rule_applied = "already_normalized"
             nutrient.confidence = get_confidence("already_normalized")
             return nutrient
 
-        # 3. Prioridade: Unidade original detectada pelo parser (para outros nutrientes)
+        # 3. Prioridade: Unidade original detectada pelo parser
         if nutrient.original_unit:
             converted_value, rule_name = self._resolve_by_unit(
                 nutrient.value, 
@@ -129,14 +135,16 @@ class Resolver:
             )
 
             if converted_value is not None:
-                nutrient.original_value = nutrient.value
-                nutrient.value = round(float(converted_value), 5)
-                nutrient.status = ValidationStatus.AUTO_CORRECTED
-                nutrient.rule_applied = f"unit_direct_{rule_name}"
-                nutrient.confidence = 1.0
-                return nutrient
+                # Validar o valor convertido antes de aceitar
+                if self.validator.is_valid(converted_value, rule):
+                    nutrient.original_value = nutrient.value
+                    nutrient.value = round(float(converted_value), 5)
+                    nutrient.status = ValidationStatus.AUTO_CORRECTED
+                    nutrient.rule_applied = f"unit_direct_{rule_name}"
+                    nutrient.confidence = 1.0
+                    return nutrient
 
-        # 3. Fallback: Busca exaustiva por candidatos válidos
+        # 4. Fallback: Busca exaustiva por candidatos válidos
         candidates = self._build_candidates(nutrient.value, rule)
         candidates = self.validator.validate_candidates(candidates, rule)
 
@@ -150,10 +158,7 @@ class Resolver:
             return nutrient
 
         if self.validator.has_multiple_candidates(candidates):
-            # Se temos múltiplos candidatos e o valor original é MUITO baixo para minerais (ex: 2.0 mg/kg)
-            # Provavelmente é g/kg ou %
             if rule.field.endswith("_mgkg") and nutrient.value < 50:
-                # Prioriza g/kg para mg/kg (fator 1000) pois é o mais comum em rótulos brasileiros para minerais
                 for val, rule_name in candidates:
                     if rule_name == "gkg_to_mgkg":
                         nutrient.original_value = nutrient.value
@@ -222,28 +227,14 @@ class Resolver:
         target_is_mgkg = rule.field.endswith("_mgkg")
         target_is_kcalkg = rule.field.endswith("_kcalkg")
 
-        # ------------------------------------------------------------------
-        # Barreira biológica: energia metabolizável só aceita unidades de
-        # energia (kcal/kg, kcal/100g, MJ/kg). Qualquer outra unidade
-        # (ex.: mg/kg, g/kg, %) é fisicamente impossível para energia e
-        # deve ser marcada como inválida (retorna None).
-        # ------------------------------------------------------------------
         if target_is_kcalkg:
             if unit == "kcal/kg":
                 return value, "already_kcalkg"
             elif unit == "kcal/100g":
-                # 1 kcal/100g == 10 kcal/kg
                 return round(value * 10.0, 2), "kcal100g_to_kcalkg"
             elif unit == "mj/kg":
-                # 1 MJ/kg == 239.006 kcal/kg
                 return round(value * 239.006, 2), "mjkg_to_kcalkg"
             else:
-                # Unidade incompatível com energia (ex.: mg/kg, g/kg, %)
-                print(
-                    f"[BIOLOGICAL BARRIER] Unidade inválida para energia "
-                    f"metabolizável: '{unit}' (valor={value}). "
-                    f"Esperado: kcal/kg, kcal/100g ou MJ/kg. Anulando."
-                )
                 return None, "invalid_energy_unit"
 
         if unit == "%":
@@ -265,7 +256,6 @@ class Resolver:
             return value, "already_uikg"
 
         if unit == "mcg":
-            # 1 mcg = 0.001 mg
             return value * 0.001, "mcg_to_mgkg"
 
         return None, None
@@ -275,34 +265,23 @@ class Resolver:
         value: float,
         rule: NormalizationRule,
     ) -> list[tuple[float, str]]:
-        """
-        Gera candidatos baseados apenas em fatores de escala e conversão seguros.
-        Removidas heurísticas de multiplicação agressivas para evitar instabilidade biológica.
-        """
         candidates: list[tuple[float, str]] = []
 
-        # 1. Overscale (Divisão por 10) - Comum em rótulos que preservam decimais
         if rule.overscale_factor:
             candidates.append((value / rule.overscale_factor, "overscale"))
 
-        # 2. Conversão de Porcentagem (Multiplicação por 10 ou 10.000)
         if rule.percent_factor:
             candidates.append((value * rule.percent_factor, "percent_conversion"))
 
-        # 3. Conversão g/kg para mg/kg (Multiplicação por 1000)
         if rule.gkg_to_mgkg:
             candidates.append((value * GKG_TO_MGKG_FACTOR, "gkg_to_mgkg"))
             
-        # 4. Decimal Shift (Multiplicação pelo fator definido na regra)
-        # Útil para casos como Cálcio 1.5 -> 1500 mg/kg
         if rule.decimal_shift_factor:
             candidates.append((value * rule.decimal_shift_factor, "decimal_shift"))
         
-        # 5. Decimal Shift Up (Multiplicação agressiva para valores muito baixos)
         if rule.decimal_shift_up:
             candidates.append((value * rule.decimal_shift_up, "decimal_shift_up"))
 
-        # 6. Deslocamento Decimal descendente (Heurística de segurança para valores altos)
         if value > rule.target_max:
             candidates.append((value / 10.0, "fix_10x_scale"))
             candidates.append((value / 100.0, "fix_100x_scale"))

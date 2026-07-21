@@ -11,6 +11,10 @@ class ValidationStatus(str, Enum):
     AMBIGUOUS = "ambiguous"
     IMPLAUSIBLE = "implausible"
     MISSING = "missing"
+    BIOLOGICALLY_IMPLAUSIBLE_SOURCE = "biologically_implausible_source_value"
+    BIOLOGICALLY_IMPLAUSIBLE_ENERGY = "biologically_implausible_energy"
+    PRODUCT_MASS_BALANCE_FAILED = "product_mass_balance_failed"
+    INVALID_CA_P_RATIO = "invalid_ca_p_ratio"
 
 
 @dataclass(slots=True, frozen=True)
@@ -82,6 +86,8 @@ class NormalizationResult:
 
     changed: bool
 
+    reason: str | None = None
+
 
 @dataclass(slots=True)
 class NormalizationLog:
@@ -93,13 +99,17 @@ class NormalizationLog:
 
     field: str
 
-    original_value: float | None
+    original_value: float | None = None
+    original_unit: str | None = None
 
-    normalized_value: float | None
+    normalized_value: float | None = None
+    normalized_unit: str | None = None
 
-    rule_applied: str | None
+    rule_applied: str | None = None
 
-    status: ValidationStatus
+    status: ValidationStatus = ValidationStatus.NORMALIZED
+
+    reason: str | None = None
 
     confidence_score: float = 1.0
 
