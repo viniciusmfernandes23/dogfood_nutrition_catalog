@@ -81,6 +81,11 @@ class ProductDimensionBuilder:
 
                 updated_at=self.timestamp,
 
+                score_macro=row.get("score_macro", 0.0),
+                score_micro=row.get("score_micro", 0.0),
+                score_amino=row.get("score_amino", 0.0),
+                score_lipids=row.get("score_lipids", 0.0),
+
             ).to_dict()
 
             for row

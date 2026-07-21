@@ -74,12 +74,8 @@ class NormalizationEngine:
 
             current_value = row.get(field)
             
-            # Trava de Segurança: Se o valor já estiver no range plausível, 
-            # ignoramos a unidade original para evitar re-multiplicação indevida.
-            # NOTA: O Resolver agora lida com a exceção de energia metabolizável 
-            # de forma determinística, então aqui apenas mantemos a lógica geral.
-            if pd.notna(current_value) and rule.target_min <= current_value <= rule.target_max:
-                original_unit = None
+            # Trava de Segurança: Removida para permitir o fluxo determinístico
+            # onde a unidade SEMPRE dita a regra de conversão, conforme recomendação arquitetural.
 
             result = self.resolver.resolve_value(
                 value=current_value,
@@ -87,7 +83,12 @@ class NormalizationEngine:
                 original_unit=original_unit
             )
 
+            # Persiste todos os metadados no DataFrame para auditoria no warehouse longo
             df.at[index, field] = result.normalized_value
+            df.at[index, f"{field}_original"] = result.original_value
+            df.at[index, f"{field}_unit"] = result.original_unit
+            df.at[index, f"{field}_status"] = result.status
+            df.at[index, f"{field}_rule"] = result.rule_applied
 
             report.add_log(
                 NormalizationLog(

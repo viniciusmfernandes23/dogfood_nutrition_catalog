@@ -83,48 +83,56 @@ class NutrientFactBuilder:
         self,
         dataframe: pd.DataFrame,
     ) -> pd.DataFrame:
-
+        """
+        Constrói o DataFrame da tabela fato de nutrientes no formato longo.
+        """
         if dataframe.empty:
-
             return pd.DataFrame()
 
         records: list[dict] = []
 
-        for row in dataframe.to_dict(
-            orient="records",
-        ):
-
-            product_id = row.get(
-                "product_id",
-            )
+        for row in dataframe.to_dict(orient="records"):
+            product_id = row.get("product_id")
 
             for nutrient in self.NUTRIENT_COLUMNS:
-
+                # O engine de normalização produz colunas:
+                # {nutrient} -> valor normalizado
+                # {nutrient}_original -> valor bruto extraído
+                # {nutrient}_unit -> unidade original
+                # {nutrient}_status -> status de normalização
+                # {nutrient}_rule -> regra aplicada
+                
                 if nutrient not in row:
                     continue
 
-                value = row.get(
-                    nutrient,
-                )
-
-                if pd.isna(value):
+                value = row.get(nutrient)
+                
+                # Se o valor é nulo, verificamos se existe um registro de erro/original
+                # para manter a auditoria (exceto se realmente não foi coletado nada)
+                original_value = row.get(f"{nutrient}_original")
+                if pd.isna(value) and pd.isna(original_value):
                     continue
 
+                # Determina a unidade normalizada com base no sufixo da coluna
+                target_unit = None
+                if nutrient.endswith("_gkg"): target_unit = "g/kg"
+                elif nutrient.endswith("_mgkg"): target_unit = "mg/kg"
+                elif nutrient.endswith("_kcalkg"): target_unit = "kcal/kg"
+                elif nutrient.endswith("_uikg"): target_unit = "UI/kg"
+
                 fact = NutrientFact(
-
                     product_id=product_id,
-
-                    nutrient_name=nutrient,
-
-                    nutrient_value=float(value),
-
+                    nutrient_key=nutrient,
+                    nutrient_value=float(value) if pd.notna(value) else None,
+                    nutrient_unit=target_unit,
+                    original_value=float(original_value) if pd.notna(original_value) else None,
+                    original_unit=row.get(f"{nutrient}_unit"),
+                    status=row.get(f"{nutrient}_status"),
+                    rule_applied=row.get(f"{nutrient}_rule"),
                     collected_at=self.timestamp,
-
                 )
 
-                records.append(
-                    fact.to_dict(),
-                )
+                records.append(fact.to_dict())
 
         fact_df = pd.DataFrame(
             records,
@@ -147,11 +155,10 @@ class NutrientFactBuilder:
 
             column
 
-            for column
-
+                        for column
             in (
                 "product_id",
-                "nutrient_name",
+                "nutrient_key",
             )
 
             if column in dataframe.columns

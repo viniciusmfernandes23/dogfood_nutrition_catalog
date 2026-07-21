@@ -69,8 +69,10 @@ class NormalizationResult:
     field: str
 
     original_value: float | None
+    original_unit: str | None
 
     normalized_value: float | None
+    normalized_unit: str | None
 
     rule_applied: str | None
 

@@ -16,6 +16,7 @@ from app.semantic.rules import (
     PRODUCT_TIER_RULES,
     PROTEIN_RULES,
 )
+from app.semantic.scoring import NutritionalScoring
 
 
 class SemanticEngine:
@@ -30,6 +31,10 @@ class SemanticEngine:
         "clinical_category",
         "protein_source",
         "product_tier",
+        "score_macro",
+        "score_micro",
+        "score_amino",
+        "score_lipids",
     )
 
     TEXT_COLUMNS = (
@@ -41,6 +46,8 @@ class SemanticEngine:
     )
 
     def __init__(self) -> None:
+
+        self.scoring = NutritionalScoring()
 
         self.product_classifier = SemanticClassifier(
             PRODUCT_CATEGORY_RULES,
@@ -226,5 +233,8 @@ class SemanticEngine:
                 semantic["product_tier"],
                 ProductTier.STANDARD.value,
             )
+
+        # Adiciona scores nutricionais categorizados
+        df = self.scoring.enrich_dataframe(df)
 
         return df

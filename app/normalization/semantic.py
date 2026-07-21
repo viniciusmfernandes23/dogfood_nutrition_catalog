@@ -14,21 +14,21 @@ class SemanticLayer:
     def apply_output_conversion(df: pd.DataFrame) -> pd.DataFrame:
         """
         Aplica as conversões de escala definidas nos metadados para cada nutriente.
-        Espera um DataFrame no formato fact_nutrient (colunas nutrient_name e nutrient_value).
+        Espera um DataFrame no formato fact_nutrient (colunas nutrient_key e nutrient_value).
         """
-        if df is None or df.empty or "nutrient_name" not in df.columns or "nutrient_value" not in df.columns:
+        if df is None or df.empty or "nutrient_key" not in df.columns or "nutrient_value" not in df.columns:
             return df
 
         # Copia para evitar efeitos colaterais
         df = df.copy()
 
         # Identifica os nutrientes únicos presentes no DataFrame
-        nutrients = df["nutrient_name"].unique()
+        nutrients = df["nutrient_key"].unique()
 
         for nutrient in nutrients:
             metadata = get_nutrient_metadata(nutrient)
             if metadata and metadata.output_scale_factor != 1.0:
-                mask = df["nutrient_name"] == nutrient
+                mask = df["nutrient_key"] == nutrient
                 # Aplica o fator de escala de saída
                 df.loc[mask, "nutrient_value"] = (df.loc[mask, "nutrient_value"] * metadata.output_scale_factor).round(2)
 

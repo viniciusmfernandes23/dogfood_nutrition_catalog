@@ -68,11 +68,20 @@ class WarehouseExporter:
         fact_nutrient: pd.DataFrame,
         fact_price_snapshot: pd.DataFrame,
     ) -> dict[str, Path]:
+        
+        # Gera a dimensão de referência de nutrientes
+        from app.warehouse.nutrient_reference import NutrientReferenceBuilder
+        dim_nutrient_ref = NutrientReferenceBuilder.build()
 
         exported = {
             "dim_product": self.export_dimension(
                 dim_product,
                 "dim_product.csv",
+            ),
+            "dim_nutrient_reference": self._export_csv(
+                dim_nutrient_ref,
+                "dim_nutrient_reference.csv",
+                append=False
             ),
             "fact_nutrient": self.export_fact(
                 fact_nutrient,
@@ -171,7 +180,10 @@ class WarehouseExporter:
                 # Cria um arquivo vazio com cabeçalhos padrão baseados no nome do arquivo
                 headers = ["product_id"]
                 if "fact_nutrient" in filename:
-                    headers = ["product_id", "nutrient_name", "nutrient_value", "collected_at"]
+                    headers = [
+                        "product_id", "nutrient_key", "nutrient_value", "nutrient_unit",
+                        "original_value", "original_unit", "status", "rule_applied", "collected_at"
+                    ]
                 elif "fact_price" in filename:
                     headers = [
                         "product_id", "marketplace", "ean", "sku_id", "sku_name",
@@ -321,12 +333,12 @@ class WarehouseExporter:
                         })
                         
                         print(f"[FINAL SANITY BARRIER] {action.capitalize()} Energia incompatível com Umidade para produto {product_id}")
-                        df.loc[prod_mask & (df["nutrient_name"] == "metabolizable_energy_kcalkg"), "nutrient_value"] = new_val
+                        df.loc[prod_mask & (df["nutrient_key"] == "metabolizable_energy_kcalkg"), "nutrient_value"] = new_val
 
         # 3. Validação de Soma de Macronutrientes por Produto
         for product_id in df["product_id"].unique():
             prod_mask = df["product_id"] == product_id
-            macros_present = df[prod_mask & (df["nutrient_name"].isin(macro_fields))]
+            macros_present = df[prod_mask & (df["nutrient_key"].isin(macro_fields))]
             
             if not macros_present.empty:
                 total_sum = macros_present["nutrient_value"].sum()
@@ -334,14 +346,14 @@ class WarehouseExporter:
                     for idx in macros_present.index:
                         self.sanity_logs.append({
                             "product_id": product_id,
-                            "field": df.at[idx, "nutrient_name"],
+                            "field": df.at[idx, "nutrient_key"],
                             "original_value": df.at[idx, "nutrient_value"],
                             "action": "nullified",
                             "reason": f"macro_sum_exceeded_{int(total_sum)}",
                             "timestamp": datetime.now().isoformat()
                         })
                     
-                    energy_row = df[prod_mask & (df["nutrient_name"] == "metabolizable_energy_kcalkg")]
+                    energy_row = df[prod_mask & (df["nutrient_key"] == "metabolizable_energy_kcalkg")]
                     if not energy_row.empty:
                         self.sanity_logs.append({
                             "product_id": product_id,
@@ -353,8 +365,8 @@ class WarehouseExporter:
                         })
 
                     print(f"[FINAL SANITY BARRIER] Soma de macros impossível ({total_sum}g/kg) no produto {product_id}. Anulando nutrientes.")
-                    df.loc[prod_mask & (df["nutrient_name"].isin(macro_fields)), "nutrient_value"] = None
-                    df.loc[prod_mask & (df["nutrient_name"] == "metabolizable_energy_kcalkg"), "nutrient_value"] = None
+                    df.loc[prod_mask & (df["nutrient_key"].isin(macro_fields)), "nutrient_value"] = None
+                    df.loc[prod_mask & (df["nutrient_key"] == "metabolizable_energy_kcalkg"), "nutrient_value"] = None
 
     # ==========================================================
     # Helpers

@@ -177,17 +177,21 @@ def run_extraction():
                     guarantees.append(None)
             full_df['raw_guarantee'] = guarantees
 
-            # Mapeamento de nutrientes
-            nutrient_mapping = {
+            # Mapeamento de nutrientes expandido
+            from app.normalization.rules import NORMALIZATION_RULES
+            nutrient_mapping = {rule.split('_')[0]: rule for rule in NORMALIZATION_RULES.keys()}
+            # Ajustes manuais para chaves especiais
+            nutrient_mapping.update({
                 'protein': 'protein_gkg', 'fat': 'fat_gkg', 'fiber': 'fiber_gkg',
-                'ash': 'ash_gkg', 'moisture': 'moisture_gkg', 'calcium_min': 'calcium_min_mgkg',
-                'calcium_max': 'calcium_max_mgkg', 'phosphorus': 'phosphorus_mgkg',
-                'sodium': 'sodium_mgkg', 'potassium': 'potassium_mgkg',
+                'ash': 'ash_gkg', 'moisture': 'moisture_gkg',
+                'calcium_min': 'calcium_min_mgkg', 'calcium_max': 'calcium_max_mgkg',
                 'metabolizable_energy': 'metabolizable_energy_kcalkg'
-            }
+            })
             
+            print(f"Processando {len(full_df)} produtos para extração de nutrientes...")
             for index, row in full_df.iterrows():
                 nutrients = parse_nutrition(row['raw_guarantee'])
+                print(f"  Nutrientes brutos encontrados para {row['product_name']}: {len(nutrients)}")
                 best_matches = {}
                 for _, nut_data in nutrients.items():
                     nut_type = nut_data['nutrient']

@@ -51,6 +51,12 @@ class ProductDimension(WarehouseModel):
 
     updated_at: datetime
 
+    # Scores Nutricionais Categorizados (com default no final)
+    score_macro: float | None = 0.0
+    score_micro: float | None = 0.0
+    score_amino: float | None = 0.0
+    score_lipids: float | None = 0.0
+
 
 # ==========================================================
 # Fato Nutrientes
@@ -59,13 +65,21 @@ class ProductDimension(WarehouseModel):
 
 @dataclass(slots=True)
 class NutrientFact(WarehouseModel):
-
+    """
+    Representa um fato nutricional no formato longo.
+    Preserva o valor original, a unidade e o status de normalização para auditoria.
+    """
     product_id: int | None
-
-    nutrient_name: str
-
-    nutrient_value: float
-
+    nutrient_key: str           # Chave canônica (ex: protein_gkg)
+    nutrient_value: float | None # Valor normalizado na unidade alvo
+    nutrient_unit: str | None    # Unidade normalizada (ex: g/kg)
+    
+    original_value: float | None # Valor extraído originalmente
+    original_unit: str | None    # Unidade extraída originalmente
+    
+    status: str | None           # Status de normalização (Normalizado, Corrigido, Implausível)
+    rule_applied: str | None     # Regra técnica aplicada
+    
     collected_at: datetime
 
 
