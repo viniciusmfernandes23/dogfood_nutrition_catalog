@@ -29,7 +29,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     "protein_gkg": NormalizationRule(
         field="protein_gkg",
         target_min=60,
-        target_max=1000,
+        target_max=600, # Reduzido de 1000 para 600 para capturar outliers impossíveis em rações completas
         overscale_factor=10,
         decimal_shift_factor=10,
         percent_factor=PERCENT_TO_GKG_FACTOR,
@@ -56,7 +56,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     "ash_gkg": NormalizationRule(
         field="ash_gkg",
         target_min=10,
-        target_max=1000,
+        target_max=150, # Reduzido de 1000 para 150 (15%) conforme relatório item 3
         overscale_factor=10,
         decimal_shift_factor=10,
         percent_factor=PERCENT_TO_GKG_FACTOR,
@@ -99,7 +99,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
 
     "phosphorus_mgkg": NormalizationRule(
         field="phosphorus_mgkg",
-        target_min=500,
+        target_min=100, # Reduzido de 500 para 100 para aceitar valores como 400 mg/kg (Relatório Item 1)
         target_max=40000,
         overscale_factor=10,
         decimal_shift_factor=100,
@@ -110,7 +110,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
 
     "sodium_mgkg": NormalizationRule(
         field="sodium_mgkg",
-        target_min=800,
+        target_min=100, # Reduzido de 800 para 100 para aceitar valores como 300 mg/kg (Relatório Item 1)
         target_max=30000,
         overscale_factor=10,
         decimal_shift_factor=100,
@@ -121,7 +121,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
 
     "potassium_mgkg": NormalizationRule(
         field="potassium_mgkg",
-        target_min=1500,
+        target_min=100, # Reduzido de 1500 para 100 para aceitar valores baixos plausíveis (Relatório Item 1)
         target_max=50000,
         overscale_factor=10,
         decimal_shift_factor=100,
@@ -137,7 +137,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     "metabolizable_energy_kcalkg": NormalizationRule(
         field="metabolizable_energy_kcalkg",
         target_min=500,
-        target_max=9000,
+        target_max=4500, # Reduzido de 9000 para 4500 para capturar outliers como 4810 kcal/kg
         overscale_factor=10,
         decimal_shift_factor=1000,
         percent_factor=10000,
@@ -316,7 +316,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     "niacin_mgkg": NormalizationRule(
         field="niacin_mgkg",
         target_min=10,
-        target_max=500,
+        target_max=300, # Reduzido de 500 para 300 para capturar outliers de ~495 mg/kg
         decimal_shift_up=1,
     ),
     "pantothenic_acid_mgkg": NormalizationRule(

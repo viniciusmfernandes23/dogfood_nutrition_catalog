@@ -210,44 +210,32 @@ class Validator:
         ):
 
             return NormalizationResult(
-
                 field=nutrient.name,
-
                 original_value=nutrient.original_value,
-
+                original_unit=nutrient.original_unit,
                 normalized_value=nutrient.value,
-
+                normalized_unit=nutrient.unit,
                 rule_applied=nutrient.rule_applied,
-
                 status=ValidationStatus.MISSING,
-
                 confidence=0.0,
-
                 changed=False,
-
             )
 
         if rule is None:
 
             return NormalizationResult(
-
                 field=nutrient.name,
-
                 original_value=nutrient.original_value,
-
+                original_unit=nutrient.original_unit,
                 normalized_value=nutrient.value,
-
+                normalized_unit=nutrient.unit,
                 rule_applied=nutrient.rule_applied,
-
                 status=ValidationStatus.NORMALIZED,
-
                 confidence=nutrient.confidence,
-
                 changed=(
                     nutrient.original_value
                     != nutrient.value
                 ),
-
             )
 
         if cls.is_valid(
@@ -267,24 +255,18 @@ class Validator:
             status = ValidationStatus.IMPLAUSIBLE
 
         return NormalizationResult(
-
             field=nutrient.name,
-
             original_value=nutrient.original_value,
-
+            original_unit=nutrient.original_unit,
             normalized_value=nutrient.value,
-
+            normalized_unit=nutrient.unit,
             rule_applied=nutrient.rule_applied,
-
             status=status,
-
             confidence=nutrient.confidence,
-
             changed=(
                 nutrient.original_value
                 != nutrient.value
             ),
-
         )
 
 

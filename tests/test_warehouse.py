@@ -112,9 +112,9 @@ def test_build_fact_nutrient():
 
     assert len(fact) >= 2
 
-    # Correção: O builder usa 'nutrient_name' e não 'nutrient'
+    # O builder usa 'nutrient_key' (Prioridade 6)
     assert (
-        "nutrient_name"
+        "nutrient_key"
         in fact.columns
     )
 
@@ -241,7 +241,7 @@ def test_export_fact_creates_csv_for_empty_dataframe(
     empty_df = pd.DataFrame(
         columns=[
             "product_id",
-            "nutrient_name",
+            "nutrient_key",
             "nutrient_value",
             "collected_at",
         ]
@@ -253,7 +253,7 @@ def test_export_fact_creates_csv_for_empty_dataframe(
     )
 
     assert output_path.exists()
-    assert "nutrient_name" in output_path.read_text(
+    assert "nutrient_key" in output_path.read_text(
         encoding="utf-8-sig"
     )
 
@@ -342,10 +342,10 @@ def test_fact_nutrient_contains_protein():
         sample_dataframe()
     )
 
-    # Correção: O nome da coluna é 'nutrient_name' e o valor contém 'protein_gkg'
+    # O nome da coluna é 'nutrient_key' e o valor contém 'protein_gkg'
     assert (
         "protein_gkg"
-        in fact["nutrient_name"].values
+        in fact["nutrient_key"].values
     )
 
 

@@ -35,9 +35,12 @@ class NormalizationEngine:
         report: DatasetNormalizationReport,
         product_id_column: str,
     ) -> None:
-
         product_id = row.get(product_id_column, -1)
         row_changed = False
+
+        # Identifica se o produto é petisco ou suplemento (Relatório Item 3.3)
+        product_category = str(row.get("product_category", "")).lower()
+        is_treat_or_supp = any(x in product_category for x in ["petisco", "snack", "suplemento", "complementar"])
 
         for field in fields:
             rule = get_rule(field)
@@ -68,7 +71,8 @@ class NormalizationEngine:
             result = self.resolver.resolve_value(
                 value=current_value,
                 rule=rule,
-                original_unit=original_unit
+                original_unit=original_unit,
+                is_treat_or_supp=is_treat_or_supp
             )
 
             df.at[index, field] = result.normalized_value
@@ -108,6 +112,10 @@ class NormalizationEngine:
         """
         Realiza validações cruzadas rigorosas para garantir a integridade biológica do produto.
         """
+        # Identifica se o produto é petisco ou suplemento (Relatório Item 3.3)
+        product_category = str(df.at[index, "product_category"]).lower() if "product_category" in df.columns else ""
+        is_treat_or_supp = any(x in product_category for x in ["petisco", "snack", "suplemento", "complementar"])
+
         required_cols = [
             "protein_gkg", "fat_gkg", "fiber_gkg", "ash_gkg", "moisture_gkg",
             "calcium_min_mgkg", "calcium_max_mgkg", "phosphorus_mgkg",
@@ -124,20 +132,22 @@ class NormalizationEngine:
             df.at[index, "calcium_min_mgkg"], df.at[index, "calcium_max_mgkg"] = ca_max, ca_min
 
         # 2.1 Prioridade 2.1: Soma dos nutrientes proximais (850–1050 g/kg)
-        macros_all = ["protein_gkg", "fat_gkg", "fiber_gkg", "ash_gkg", "moisture_gkg"]
-        present_macros = [m for m in macros_all if pd.notna(df.at[index, m])]
-        macro_sum = sum(df.at[index, m] for m in present_macros)
-        
-        # Só valida se tivermos um conjunto representativo de macronutrientes (pelo menos 3)
-        # para evitar anular linhas onde apenas a proteína foi extraída, por exemplo.
-        if len(present_macros) >= 3:
-            if macro_sum < 850 or macro_sum > 1050:
-                print(f"[BIOLOGICAL AUDIT] Falha no balanço de massa ({macro_sum}g/kg) no produto {product_id}.")
-                for m in macros_all:
-                    df.at[index, f"{m}_status"] = ValidationStatus.PRODUCT_MASS_BALANCE_FAILED
-                    df.at[index, m] = None
-                df.at[index, "metabolizable_energy_kcalkg"] = None
-                return 
+        # Para petiscos/suplementos, o balanço de massa pode ser diferente, então ignoramos (Relatório Item 3.3)
+        if not is_treat_or_supp:
+            macros_all = ["protein_gkg", "fat_gkg", "fiber_gkg", "ash_gkg", "moisture_gkg"]
+            present_macros = [m for m in macros_all if pd.notna(df.at[index, m])]
+            macro_sum = sum(df.at[index, m] for m in present_macros)
+            
+            # Só valida se tivermos um conjunto representativo de macronutrientes (pelo menos 3)
+            # para evitar anular linhas onde apenas a proteína foi extraída, por exemplo.
+            if len(present_macros) >= 3:
+                if macro_sum < 850 or macro_sum > 1050:
+                    print(f"[BIOLOGICAL AUDIT] Falha no balanço de massa ({macro_sum}g/kg) no produto {product_id}.")
+                    for m in macros_all:
+                        df.at[index, f"{m}_status"] = ValidationStatus.PRODUCT_MASS_BALANCE_FAILED
+                        df.at[index, m] = None
+                    df.at[index, "metabolizable_energy_kcalkg"] = None
+                    return 
 
         # 2.2 Prioridade 2.2: Relação Cálcio:Fósforo (1:1 até 2:1)
         p = df.at[index, "phosphorus_mgkg"]
@@ -158,13 +168,16 @@ class NormalizationEngine:
 
         # 3. Limites de Micronutrientes (Prioridade 4)
         # Reforça limites biológicos para todos os minerais
+        # Para petiscos/suplementos, permitimos até 3x o limite máximo (Relatório Item 3.3)
+        multiplier = 3.0 if is_treat_or_supp else 1.0
+        
         for mineral in ["sodium_mgkg", "potassium_mgkg", "magnesium_mgkg", "zinc_mgkg", "copper_mgkg", "selenium_mgkg", "iodine_mgkg", "manganese_mgkg"]:
             if mineral in df.columns:
                 val = df.at[index, mineral]
                 if pd.notna(val):
                     rule = get_rule(mineral)
-                    if rule and (val < rule.target_min or val > rule.target_max):
-                        print(f"[BIOLOGICAL AUDIT] Micronutriente fora da faixa: {mineral}={val}")
+                    if rule and (val < rule.target_min or val > (rule.target_max * multiplier)):
+                        print(f"[BIOLOGICAL AUDIT] Micronutriente fora da faixa ({'treat' if is_treat_or_supp else 'standard'}): {mineral}={val}")
                         df.at[index, f"{mineral}_status"] = ValidationStatus.IMPLAUSIBLE
                         df.at[index, mineral] = None
 

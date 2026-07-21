@@ -121,10 +121,19 @@ class Resolver:
         # 2. Fluxo Padrão para outros nutrientes
         # Mesmo que venha marcado como already_normalized, deve passar pelas barreiras sanitárias (Prioridade 3.2)
         if self.validator.is_valid(nutrient.value, rule):
-            nutrient.status = ValidationStatus.NORMALIZED
-            nutrient.rule_applied = "already_normalized"
-            nutrient.confidence = get_confidence("already_normalized")
-            return nutrient
+            # Se a unidade original for igual à unidade alvo, temos certeza absoluta
+            if nutrient.original_unit == nutrient.unit:
+                nutrient.status = ValidationStatus.NORMALIZED
+                nutrient.rule_applied = "already_normalized"
+                nutrient.confidence = get_confidence("already_normalized")
+                return nutrient
+            
+            # Se não houver unidade original, mas o valor é válido, assumimos normalizado
+            if not nutrient.original_unit:
+                nutrient.status = ValidationStatus.NORMALIZED
+                nutrient.rule_applied = "already_normalized"
+                nutrient.confidence = get_confidence("already_normalized")
+                return nutrient
 
         # 3. Prioridade: Unidade original detectada pelo parser
         if nutrient.original_unit:
@@ -143,9 +152,20 @@ class Resolver:
                     nutrient.rule_applied = f"unit_direct_{rule_name}"
                     nutrient.confidence = 1.0
                     return nutrient
+                
+                # Se a conversão direta por unidade resultou em algo INVÁLIDO,
+                # não devemos tentar heurísticas que contradigam a unidade explícita.
+                # Relatório Item 1: Proteção contra corrupção de dados.
+                print(f"[AUDIT] Conversão direta por unidade ({nutrient.original_unit}) resultou em valor implausível: {converted_value}")
+                nutrient.original_value = nutrient.value
+                nutrient.value = None
+                nutrient.status = ValidationStatus.IMPLAUSIBLE
+                nutrient.rule_applied = f"invalid_conversion_{rule_name}"
+                nutrient.confidence = 0.0
+                return nutrient
 
         # 4. Fallback: Busca exaustiva por candidatos válidos
-        candidates = self._build_candidates(nutrient.value, rule)
+        candidates = self._build_candidates(nutrient, rule)
         candidates = self.validator.validate_candidates(candidates, rule)
 
         if self.validator.has_single_candidate(candidates):
@@ -173,6 +193,9 @@ class Resolver:
             nutrient.confidence = get_confidence("ambiguous")
             return nutrient
 
+        # Se não houver candidatos válidos, anula o valor de forma consistente (Relatório Item 2)
+        nutrient.original_value = nutrient.value
+        nutrient.value = None
         nutrient.status = ValidationStatus.IMPLAUSIBLE
         nutrient.rule_applied = "implausible"
         nutrient.confidence = get_confidence("implausible")
@@ -183,6 +206,7 @@ class Resolver:
         value: float | None,
         rule: NormalizationRule,
         original_unit: str | None = None,
+        is_treat_or_supp: bool = False,
     ) -> NormalizationResult:
         
         target_unit = "g/kg"
@@ -200,7 +224,14 @@ class Resolver:
             original_unit=original_unit
         )
 
-        nutrient = self.resolve(nutrient, rule)
+        # Se for petisco/suplemento, flexibilizamos o validador (Relatório Item 3.3)
+        if is_treat_or_supp:
+            # Como NormalizationRule é Frozen, criamos uma cópia modificada
+            from dataclasses import replace as dc_replace
+            modified_rule = dc_replace(rule, target_max=rule.target_max * 3.0)
+            nutrient = self.resolve(nutrient, modified_rule)
+        else:
+            nutrient = self.resolve(nutrient, rule)
 
         return NormalizationResult(
             field=rule.field,
@@ -262,9 +293,13 @@ class Resolver:
 
     def _build_candidates(
         self,
-        value: float,
+        nutrient: NormalizedNutrient,
         rule: NormalizationRule,
     ) -> list[tuple[float, str]]:
+        """
+        Gera candidatos baseados apenas em fatores de escala e conversão seguros.
+        """
+        value = nutrient.value
         candidates: list[tuple[float, str]] = []
 
         if rule.overscale_factor:
@@ -276,8 +311,11 @@ class Resolver:
         if rule.gkg_to_mgkg:
             candidates.append((value * GKG_TO_MGKG_FACTOR, "gkg_to_mgkg"))
             
+        # Corrigir bug sistemático de normalização (Relatório Item 1)
+        # Só aplicar decimal_shift quando original_unit ≠ nutrient_unit
         if rule.decimal_shift_factor:
-            candidates.append((value * rule.decimal_shift_factor, "decimal_shift"))
+            if nutrient.original_unit != nutrient.unit:
+                candidates.append((value * rule.decimal_shift_factor, "decimal_shift"))
         
         if rule.decimal_shift_up:
             candidates.append((value * rule.decimal_shift_up, "decimal_shift_up"))
