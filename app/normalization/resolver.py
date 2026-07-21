@@ -128,6 +128,18 @@ class Resolver:
                 nutrient.confidence = get_confidence("already_normalized")
                 return nutrient
             
+            # Unidades impossíveis para nutrientes que não são energia/vitaminas
+            # (Ex: Magnésio em kcal/kg) -> Devemos descartar mesmo que o valor pareça plausível,
+            # pois indica erro grave de rotulagem/extração.
+            if nutrient.original_unit in ["kcal/kg", "ui/kg"] and not (target_is_kcalkg or rule.field.endswith("_uikg")):
+                print(f"[AUDIT] Unidade impossível para o nutriente: {nutrient.original_unit}")
+                nutrient.original_value = nutrient.value
+                nutrient.value = None
+                nutrient.status = ValidationStatus.IMPLAUSIBLE
+                nutrient.rule_applied = f"invalid_unit_{nutrient.original_unit.replace('/', '')}"
+                nutrient.confidence = 0.0
+                return nutrient
+            
             # Se não houver unidade original, mas o valor é válido, assumimos normalizado
             if not nutrient.original_unit:
                 nutrient.status = ValidationStatus.NORMALIZED
@@ -154,8 +166,17 @@ class Resolver:
                     return nutrient
                 
                 # Se a conversão direta por unidade resultou em algo INVÁLIDO,
-                # não devemos tentar heurísticas que contradigam a unidade explícita.
-                # Relatório Item 1: Proteção contra corrupção de dados.
+                # mas o valor ORIGINAL já era plausível na unidade alvo, 
+                # damos prioridade ao valor original (Evita o bug de descartar biotina/selênio plausíveis)
+                if self.validator.is_valid(nutrient.value, rule):
+                    print(f"[AUDIT] Unidade conflituosa ({nutrient.original_unit}), mas valor original {nutrient.value} é plausível em {nutrient.unit}. Mantendo.")
+                    nutrient.status = ValidationStatus.NORMALIZED
+                    nutrient.rule_applied = "already_normalized_despite_unit_conflict"
+                    nutrient.confidence = 0.8 # Confiança reduzida por conflito de unidade
+                    return nutrient
+
+                # Se a conversão direta por unidade resultou em algo INVÁLIDO e o original também é inválido,
+                # descartamos o valor.
                 print(f"[AUDIT] Conversão direta por unidade ({nutrient.original_unit}) resultou em valor implausível: {converted_value}")
                 nutrient.original_value = nutrient.value
                 nutrient.value = None
@@ -257,6 +278,7 @@ class Resolver:
     ) -> tuple[float | None, str | None]:
         target_is_mgkg = rule.field.endswith("_mgkg")
         target_is_kcalkg = rule.field.endswith("_kcalkg")
+        target_is_uikg = rule.field.endswith("_uikg")
 
         if target_is_kcalkg:
             if unit == "kcal/kg":
@@ -284,10 +306,17 @@ class Resolver:
             return value / GKG_TO_MGKG_FACTOR, "mgkg_to_gkg"
             
         if unit == "ui/kg":
-            return value, "already_uikg"
+            if target_is_uikg:
+                return value, "already_uikg"
+            return None, "invalid_unit_for_non_vitamin"
 
         if unit == "mcg":
             return value * 0.001, "mcg_to_mgkg"
+
+        # Se a unidade for kcal/kg ou ui/kg para um mineral (ex: magnésio), 
+        # é um erro de rotulagem do crawler. Retornamos None para invalid_unit.
+        if (unit == "kcal/kg" or unit == "ui/kg") and not (target_is_kcalkg or target_is_uikg):
+            return None, f"invalid_unit_{unit.replace('/', '')}"
 
         return None, None
 
