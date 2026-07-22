@@ -201,6 +201,13 @@ class WarehouseExporter:
         if filename == "fact_nutrient.csv" and "nutrient_value" in dataframe.columns:
             self._apply_final_biological_sanity_check(dataframe)
             
+            # Remover duplicatas de perfil completo (product_id + nutrient_key + value)
+            # Relatório Item 8
+            dataframe = dataframe.drop_duplicates(
+                subset=["product_id", "nutrient_key", "nutrient_value"],
+                keep="last"
+            )
+            
             # Prioridade 6: O Power BI não deve realizar correções. Receber apenas dados já consistentes.
             # Aplica a Camada Semântica orientada por metadados
             dataframe = SemanticLayer.apply_output_conversion(dataframe)

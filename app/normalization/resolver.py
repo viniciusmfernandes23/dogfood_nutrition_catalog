@@ -47,13 +47,11 @@ class Resolver:
                 return nutrient
 
         # Proteção e Auto-Correção de valores astronômicos
-        # Se o valor for > 100.000, provavelmente sofreu múltiplas multiplicações indevidas
         if nutrient.value > 100_000:
             temp_value = nutrient.value
-            # Tenta divisões sucessivas por 10.000 (%), 1.000 (g/kg) e 10 (overscale)
             for factor in [10000.0, 1000.0, 10.0]:
                 test_val = nutrient.value
-                for _ in range(4): # Tenta até 4 níveis de escala acumulada
+                for _ in range(4):
                     test_val /= factor
                     if self.validator.is_valid(test_val, rule):
                         nutrient.original_value = nutrient.value
@@ -61,11 +59,8 @@ class Resolver:
                         nutrient.status = ValidationStatus.AUTO_CORRECTED
                         nutrient.rule_applied = f"fix_accumulated_scale_{int(factor)}"
                         nutrient.confidence = 1.0
-                        print(f"[AUDIT] Valor corrigido recursivamente ({factor}): {nutrient.value}")
                         return nutrient
             
-            # Se não conseguiu corrigir, anula o valor para não poluir o dataset
-            print(f"[AUDIT] VALOR ANULADO (IMPOSSÍVEL CORRIGIR): {nutrient.value}")
             nutrient.original_value = nutrient.value
             nutrient.value = None
             nutrient.status = ValidationStatus.IMPLAUSIBLE
@@ -77,6 +72,7 @@ class Resolver:
             return nutrient
 
         target_is_kcalkg = rule.field.endswith("_kcalkg")
+        target_is_uikg = rule.field.endswith("_uikg")
 
         # 1. Fluxo Determinístico para Energia Metabolizável
         if target_is_kcalkg:
@@ -94,16 +90,15 @@ class Resolver:
                 rule
             )
 
-            if rule_name == "invalid_energy_unit":
+            if rule_name and "invalid" in rule_name:
                 nutrient.original_value = nutrient.value
                 nutrient.value = None
                 nutrient.status = ValidationStatus.IMPLAUSIBLE
-                nutrient.rule_applied = "invalid_energy_unit"
+                nutrient.rule_applied = rule_name
                 nutrient.confidence = 0.0
                 return nutrient
 
             if converted_value is not None:
-                # Prioridade 1.3: Validar Energia Metabolizável APÓS conversão (500-9000 kcal/kg)
                 if 500 <= converted_value <= 9000:
                     nutrient.original_value = nutrient.value
                     nutrient.value = round(float(converted_value), 5)
@@ -119,33 +114,24 @@ class Resolver:
                 return nutrient
 
         # 2. Fluxo Padrão para outros nutrientes
-        # Mesmo que venha marcado como already_normalized, deve passar pelas barreiras sanitárias (Prioridade 3.2)
-        if self.validator.is_valid(nutrient.value, rule):
-            # Se a unidade original for igual à unidade alvo, temos certeza absoluta
-            if nutrient.original_unit == nutrient.unit:
-                nutrient.status = ValidationStatus.NORMALIZED
-                nutrient.rule_applied = "already_normalized"
-                nutrient.confidence = get_confidence("already_normalized")
-                return nutrient
-            
-            # Unidades impossíveis para nutrientes que não são energia/vitaminas
-            # (Ex: Magnésio em kcal/kg) -> Devemos descartar mesmo que o valor pareça plausível,
-            # pois indica erro grave de rotulagem/extração.
-            if nutrient.original_unit in ["kcal/kg", "ui/kg"] and not (target_is_kcalkg or rule.field.endswith("_uikg")):
-                print(f"[AUDIT] Unidade impossível para o nutriente: {nutrient.original_unit}")
+        # Se a unidade original for impossível para este nutriente (ex: Magnésio em kcal/kg ou ui/kg)
+        # devemos anular IMEDIATAMENTE antes de qualquer outra lógica.
+        if nutrient.original_unit in ["kcal/kg", "ui/kg", "kcal/100g", "mj/kg"]:
+             if not (target_is_kcalkg or target_is_uikg):
+                print(f"[AUDIT] Unidade impossível ({nutrient.original_unit}) para {rule.field}. Anulando.")
                 nutrient.original_value = nutrient.value
                 nutrient.value = None
                 nutrient.status = ValidationStatus.IMPLAUSIBLE
                 nutrient.rule_applied = f"invalid_unit_{nutrient.original_unit.replace('/', '')}"
                 nutrient.confidence = 0.0
                 return nutrient
-            
-            # Se não houver unidade original, mas o valor é válido, assumimos normalizado
-            if not nutrient.original_unit:
-                nutrient.status = ValidationStatus.NORMALIZED
-                nutrient.rule_applied = "already_normalized"
-                nutrient.confidence = get_confidence("already_normalized")
-                return nutrient
+
+        # Se a unidade original for igual à unidade alvo e o valor é válido
+        if nutrient.original_unit == nutrient.unit and self.validator.is_valid(nutrient.value, rule):
+            nutrient.status = ValidationStatus.NORMALIZED
+            nutrient.rule_applied = "already_normalized"
+            nutrient.confidence = get_confidence("already_normalized")
+            return nutrient
 
         # 3. Prioridade: Unidade original detectada pelo parser
         if nutrient.original_unit:
@@ -156,7 +142,8 @@ class Resolver:
             )
 
             if converted_value is not None:
-                # Validar o valor convertido antes de aceitar
+                # Se a unidade é explícita, a conversão DEVE ser válida.
+                # Não existe mais "already_normalized_despite_unit_conflict".
                 if self.validator.is_valid(converted_value, rule):
                     nutrient.original_value = nutrient.value
                     nutrient.value = round(float(converted_value), 5)
@@ -164,28 +151,24 @@ class Resolver:
                     nutrient.rule_applied = f"unit_direct_{rule_name}"
                     nutrient.confidence = 1.0
                     return nutrient
-                
-                # Se a conversão direta por unidade resultou em algo INVÁLIDO,
-                # mas o valor ORIGINAL já era plausível na unidade alvo, 
-                # damos prioridade ao valor original (Evita o bug de descartar biotina/selênio plausíveis)
-                if self.validator.is_valid(nutrient.value, rule):
-                    print(f"[AUDIT] Unidade conflituosa ({nutrient.original_unit}), mas valor original {nutrient.value} é plausível em {nutrient.unit}. Mantendo.")
-                    nutrient.status = ValidationStatus.NORMALIZED
-                    nutrient.rule_applied = "already_normalized_despite_unit_conflict"
-                    nutrient.confidence = 0.8 # Confiança reduzida por conflito de unidade
+                else:
+                    # Se a conversão por unidade falhou, o dado é incoerente.
+                    print(f"[AUDIT] Conflito de unidade em {rule.field}: {nutrient.value} {nutrient.original_unit} -> {converted_value} {nutrient.unit} (INVÁLIDO)")
+                    nutrient.original_value = nutrient.value
+                    nutrient.value = None
+                    nutrient.status = ValidationStatus.IMPLAUSIBLE
+                    nutrient.rule_applied = f"invalid_conversion_{rule_name}"
+                    nutrient.confidence = 0.0
                     return nutrient
 
-                # Se a conversão direta por unidade resultou em algo INVÁLIDO e o original também é inválido,
-                # descartamos o valor.
-                print(f"[AUDIT] Conversão direta por unidade ({nutrient.original_unit}) resultou em valor implausível: {converted_value}")
-                nutrient.original_value = nutrient.value
-                nutrient.value = None
-                nutrient.status = ValidationStatus.IMPLAUSIBLE
-                nutrient.rule_applied = f"invalid_conversion_{rule_name}"
-                nutrient.confidence = 0.0
-                return nutrient
+        # 4. Fallback: Se não houver unidade ou unidade falhou, tenta heurísticas apenas se o valor for válido
+        if self.validator.is_valid(nutrient.value, rule):
+            nutrient.status = ValidationStatus.NORMALIZED
+            nutrient.rule_applied = "already_normalized"
+            nutrient.confidence = get_confidence("already_normalized")
+            return nutrient
 
-        # 4. Fallback: Busca exaustiva por candidatos válidos
+        # 5. Busca exaustiva por candidatos válidos (Heurísticas de escala)
         candidates = self._build_candidates(nutrient, rule)
         candidates = self.validator.validate_candidates(candidates, rule)
 
@@ -199,22 +182,12 @@ class Resolver:
             return nutrient
 
         if self.validator.has_multiple_candidates(candidates):
-            if rule.field.endswith("_mgkg") and nutrient.value < 50:
-                for val, rule_name in candidates:
-                    if rule_name == "gkg_to_mgkg":
-                        nutrient.original_value = nutrient.value
-                        nutrient.value = val
-                        nutrient.status = ValidationStatus.AUTO_CORRECTED
-                        nutrient.rule_applied = "heuristic_low_mineral_gkg"
-                        nutrient.confidence = 0.9
-                        return nutrient
-
             nutrient.status = ValidationStatus.AMBIGUOUS
             nutrient.rule_applied = "ambiguous"
             nutrient.confidence = get_confidence("ambiguous")
             return nutrient
 
-        # Se não houver candidatos válidos, anula o valor de forma consistente (Relatório Item 2)
+        # Se não houver candidatos válidos, anula
         nutrient.original_value = nutrient.value
         nutrient.value = None
         nutrient.status = ValidationStatus.IMPLAUSIBLE
@@ -245,10 +218,9 @@ class Resolver:
             original_unit=original_unit
         )
 
-        # Se for petisco/suplemento, flexibilizamos o validador (Relatório Item 3.3)
         if is_treat_or_supp:
-            # Como NormalizationRule é Frozen, criamos uma cópia modificada
             from dataclasses import replace as dc_replace
+            # Flexibiliza limites para petiscos/suplementos
             modified_rule = dc_replace(rule, target_max=rule.target_max * 3.0)
             nutrient = self.resolve(nutrient, modified_rule)
         else:
@@ -308,15 +280,10 @@ class Resolver:
         if unit == "ui/kg":
             if target_is_uikg:
                 return value, "already_uikg"
-            return None, "invalid_unit_for_non_vitamin"
+            return None, "invalid_unit_uikg"
 
         if unit == "mcg":
             return value * 0.001, "mcg_to_mgkg"
-
-        # Se a unidade for kcal/kg ou ui/kg para um mineral (ex: magnésio), 
-        # é um erro de rotulagem do crawler. Retornamos None para invalid_unit.
-        if (unit == "kcal/kg" or unit == "ui/kg") and not (target_is_kcalkg or target_is_uikg):
-            return None, f"invalid_unit_{unit.replace('/', '')}"
 
         return None, None
 
@@ -325,9 +292,6 @@ class Resolver:
         nutrient: NormalizedNutrient,
         rule: NormalizationRule,
     ) -> list[tuple[float, str]]:
-        """
-        Gera candidatos baseados apenas em fatores de escala e conversão seguros.
-        """
         value = nutrient.value
         candidates: list[tuple[float, str]] = []
 
@@ -340,8 +304,6 @@ class Resolver:
         if rule.gkg_to_mgkg:
             candidates.append((value * GKG_TO_MGKG_FACTOR, "gkg_to_mgkg"))
             
-        # Corrigir bug sistemático de normalização (Relatório Item 1)
-        # Só aplicar decimal_shift quando original_unit ≠ nutrient_unit
         if rule.decimal_shift_factor:
             if nutrient.original_unit != nutrient.unit:
                 candidates.append((value * rule.decimal_shift_factor, "decimal_shift"))

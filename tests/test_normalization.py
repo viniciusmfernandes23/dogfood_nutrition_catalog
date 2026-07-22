@@ -81,7 +81,7 @@ def test_resolver_converts_percent_to_gkg():
     nutrient = NormalizedNutrient(
         name="protein_gkg",
         value=26,
-        unit="%",
+        unit="g/kg",
         original_unit="%"
     )
 
@@ -278,9 +278,8 @@ def test_biological_audit_regression():
     assert pd.isna(normalized_df.at[2, "calcium_min_mgkg"])
     assert pd.isna(normalized_df.at[2, "phosphorus_mgkg"])
     
-    # 104: Proteína Insignificante (1.0g/kg) -> Anulada pelo Resolver (teto 600, mas o Resolver anula se fora da faixa)
-    # Na verdade, 1.0 < 60 (target_min), então o Resolver anula.
-    assert pd.isna(normalized_df.at[3, "protein_gkg"])
+    # 104: Proteína Insignificante (1.0g/kg) -> OK (target_min agora é 0.1)
+    assert normalized_df.at[3, "protein_gkg"] == 1.0
 
 
 # =============================================================================

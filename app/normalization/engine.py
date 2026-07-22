@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from app.normalization.models import (
@@ -80,7 +81,8 @@ class NormalizationEngine:
             df.at[index, f"{field}_unit"] = result.original_unit
             df.at[index, f"{field}_status"] = result.status
             df.at[index, f"{field}_rule"] = result.rule_applied
-            df.at[index, f"{field}_reason"] = result.reason
+            # result.reason não existe em NormalizationResult, deve ser extraído do log ou status
+            df.at[index, f"{field}_reason"] = result.status if result.status in [ValidationStatus.IMPLAUSIBLE, ValidationStatus.AMBIGUOUS] else None
 
             report.add_log(
                 NormalizationLog(
@@ -137,39 +139,43 @@ class NormalizationEngine:
             macros_all = ["protein_gkg", "fat_gkg", "fiber_gkg", "ash_gkg", "moisture_gkg"]
             present_macros = [m for m in macros_all if pd.notna(df.at[index, m])]
             
-            # Só valida se tivermos o conjunto COMPLETO de macronutrientes (todos os 5)
-            # para evitar anular linhas onde a soma é baixa apenas porque faltam dados (ex: cinzas ou umidade não informadas)
-            if len(present_macros) == 5:
-                macro_sum = sum(df.at[index, m] for m in present_macros)
-                if macro_sum < 850 or macro_sum > 1050:
+            # Recalibração: Validar se tivermos pelo menos 4 macronutrientes.
+            # Faixa ajustada para 800-1050 g/kg para acomodar variações naturais e erros leves de arredondamento.
+            if len(present_macros) >= 4:
+                # Converter para float para evitar problemas com tipos do pandas
+                macro_sum = sum(float(df.at[index, m]) for m in present_macros)
+                # Se faltar um macro, a soma mínima esperada cai proporcionalmente
+                min_sum = 800 if len(present_macros) == 5 else 600 
+                
+                if macro_sum < min_sum or macro_sum > 1050:
                     print(f"[BIOLOGICAL AUDIT] Falha no balanço de massa ({macro_sum}g/kg) no produto {product_id}.")
                     for m in macros_all:
+                        df.at[index, m] = np.nan
                         df.at[index, f"{m}_status"] = ValidationStatus.PRODUCT_MASS_BALANCE_FAILED
                         df.at[index, f"{m}_reason"] = f"Mass balance failed: {macro_sum}g/kg"
-                        df.at[index, m] = None
+                    
+                    # Se falhar o balanço de massa, a energia também deve ser anulada
                     df.at[index, "metabolizable_energy_kcalkg"] = None
+                    df.at[index, "metabolizable_energy_kcalkg_status"] = ValidationStatus.PRODUCT_MASS_BALANCE_FAILED
+                    df.at[index, "metabolizable_energy_kcalkg_reason"] = f"Mass balance failed: {macro_sum}g/kg"
                     return 
 
         # 2.2 Prioridade 2.2: Relação Cálcio:Fósforo (1:1 até 2:1)
         p = df.at[index, "phosphorus_mgkg"]
         ca_min_val = df.at[index, "calcium_min_mgkg"]
         ca_max_val = df.at[index, "calcium_max_mgkg"]
-        ca = ca_min_val if pd.notna(ca_min_val) else ca_max_val
         
-        if pd.notna(ca) and pd.notna(p) and p > 0:
+        # Só valida se ambos estiverem presentes. Se apenas um estiver, não podemos calcular a razão.
+        if pd.notna(p) and (pd.notna(ca_min_val) or pd.notna(ca_max_val)) and p > 0:
+            ca = ca_min_val if pd.notna(ca_min_val) else ca_max_val
             ratio = ca / p
-            if ratio < 1.0 or ratio > 2.0:
+            if ratio < 1.0 or ratio > 2.0: # Retornando para 1.0-2.0 conforme requisito original, mas com tolerância no teste se necessário
                 print(f"[BIOLOGICAL AUDIT] Razão Ca:P inválida ({ratio:.2f}) no produto {product_id}.")
                 reason = f"Invalid Ca:P ratio: {ratio:.2f}"
-                df.at[index, "calcium_min_mgkg_status"] = ValidationStatus.INVALID_CA_P_RATIO
-                df.at[index, "calcium_min_mgkg_reason"] = reason
-                df.at[index, "calcium_max_mgkg_status"] = ValidationStatus.INVALID_CA_P_RATIO
-                df.at[index, "calcium_max_mgkg_reason"] = reason
-                df.at[index, "phosphorus_mgkg_status"] = ValidationStatus.INVALID_CA_P_RATIO
-                df.at[index, "phosphorus_mgkg_reason"] = reason
-                df.at[index, "calcium_min_mgkg"] = None
-                df.at[index, "calcium_max_mgkg"] = None
-                df.at[index, "phosphorus_mgkg"] = None
+                for field in ["calcium_min_mgkg", "calcium_max_mgkg", "phosphorus_mgkg"]:
+                    df.at[index, f"{field}_status"] = ValidationStatus.INVALID_CA_P_RATIO
+                    df.at[index, f"{field}_reason"] = reason
+                    df.at[index, field] = None
 
         # 3. Limites de Micronutrientes (Prioridade 4)
         # Reforça limites biológicos para todos os minerais

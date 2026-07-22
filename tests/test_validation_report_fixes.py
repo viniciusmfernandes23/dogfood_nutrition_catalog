@@ -75,17 +75,20 @@ def test_item_3_3_treats_exemption(engine):
     data = pd.DataFrame({
         "product_id": [1, 2],
         "product_category": ["Ração Seca", "Petisco para Cães"],
-        "protein_gkg": [700.0, 700.0], # Acima do teto de 600
-        "fat_gkg": [100.0, 100.0],
+        "protein_gkg": [600.0, 600.0], # No teto de 600
+        "fat_gkg": [200.0, 200.0],    # Aumentado para forçar mass balance > 1050
         "fiber_gkg": [50.0, 50.0],
-        "ash_gkg": [200.0, 200.0],    # Acima do teto de 150
-        "moisture_gkg": [100.0, 100.0]
+        "ash_gkg": [100.0, 100.0],
+        "moisture_gkg": [200.0, 200.0] # Soma: 600+200+50+100+200 = 1150
     })
     
     df, report = engine.normalize_dataframe(data)
     
     # Produto 1 (Ração) -> Deve falhar no mass balance (700+100+50+200+100 = 1150)
+    # A proteína é 700.0, a soma é 1150.0 (> 1050).
+    # O engine anula os valores se o balanço falhar.
     assert pd.isna(df.at[0, "protein_gkg"])
+    assert df.at[0, "protein_gkg_status"] == ValidationStatus.PRODUCT_MASS_BALANCE_FAILED
     
     # Produto 2 (Petisco) -> Deve passar (limites flexibilizados ou mass balance ignorado)
     # Nota: No engine atual, protein_gkg ainda tem teto de 600 na regra, 

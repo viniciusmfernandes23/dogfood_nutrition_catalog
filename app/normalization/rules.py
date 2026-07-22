@@ -28,8 +28,8 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
 
     "protein_gkg": NormalizationRule(
         field="protein_gkg",
-        target_min=60,
-        target_max=600, # Reduzido de 1000 para 600 para capturar outliers impossíveis em rações completas
+        target_min=0.1, # Reduzido para aceitar petiscos de baixa proteína
+        target_max=600,
         overscale_factor=10,
         decimal_shift_factor=10,
         percent_factor=PERCENT_TO_GKG_FACTOR,
@@ -37,7 +37,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
 
     "fat_gkg": NormalizationRule(
         field="fat_gkg",
-        target_min=20,
+        target_min=0.01, # Reduzido de 20 para 0.01 para aceitar conversões de mg/kg para g/kg (Relatório Item 🆕)
         target_max=1000,
         overscale_factor=10,
         decimal_shift_factor=10,
