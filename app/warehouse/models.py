@@ -51,11 +51,7 @@ class ProductDimension(WarehouseModel):
 
     updated_at: datetime
 
-    # Scores Nutricionais Categorizados (com default no final)
-    score_macro: float | None = 0.0
-    score_micro: float | None = 0.0
-    score_amino: float | None = 0.0
-    score_lipids: float | None = 0.0
+
 
 
 # ==========================================================
