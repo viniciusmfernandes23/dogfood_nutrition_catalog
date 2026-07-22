@@ -26,7 +26,7 @@ O coração do sistema é o motor de normalização, que opera em três camadas 
     - Resolve erros de escala (10x, 100x) via heurísticas de plausibilidade.
     - **Proteção Anti-Erro:** Rejeita unidades impossíveis (ex: Magnésio em `kcal/kg`).
 2.  **Engine (Auditoria Biológica Cruzada):**
-    - **Balanço de Massa:** Verifica se a soma de Proteína, Gordura, Fibra, Cinzas e Umidade está entre **800 e 1050 g/kg** (aplicado quando >= 4 macronutrientes estão presentes).
+    - **Balanço de Massa:** Verifica se a soma de Proteína, Gordura, Fibra, Cinzas e Umidade está entre **600 e 1050 g/kg** (aplicado quando >= 4 macronutrientes estão presentes). Este limite inferior foi recalibrado para acomodar a presença de 25-40% de Carboidratos (NFE) típicos em rações secas.
     - **Razão Ca:P:** Valida se a relação Cálcio/Fósforo está entre **1.0 e 2.0**.
     - **Diferenciação por Categoria:** Petiscos e Suplementos possuem limites de micronutrientes flexibilizados em até **3x** e são isentos do balanço de massa proximal.
 3.  **Barreira de Sanidade Final (`exporter.py`):**

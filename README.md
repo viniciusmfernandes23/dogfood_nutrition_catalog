@@ -26,7 +26,7 @@ graph TD
     - Corrige erros sistemáticos de escala (10x, 100x) através de heurísticas de plausibilidade.
     - Mantém rastreabilidade completa (`original_value` vs `normalized_value`).
 - **Auditoria Biológica de Precisão:**
-    - **Balanço de Massa:** Verifica se a soma de macronutrientes (Proteína, Gordura, Fibra, Cinzas e Umidade) está na faixa biológica (800-1050 g/kg).
+    - **Balanço de Massa:** Verifica se a soma de macronutrientes (Proteína, Gordura, Fibra, Cinzas e Umidade) está na faixa biológica (**600-1050 g/kg**), considerando a presença de Carboidratos (NFE) em rações secas.
     - **Razão Ca:P:** Valida a relação essencial entre Cálcio e Fósforo (1:1 a 2:1).
     - **Contexto de Categoria:** Flexibiliza automaticamente limites para Petiscos e Suplementos (até 3x o teto padrão).
     - **Energia Metabolizável:** Validação determinística baseada em unidades e faixas físicas (500-4500 kcal/kg).

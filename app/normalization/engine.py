@@ -159,10 +159,14 @@ class NormalizationEngine:
             
             # Aplica barreira se houver dados suficientes (>= 4 macros)
             if len(present_macros) >= 4:
-                macro_sum = sum(float(df.at[index, m]) for m in present_macros)
-                min_sum = 800 if len(present_macros) == 5 else 600 
+                macro_sum = float(sum(float(df.at[index, m]) for m in present_macros))
                 
-                if macro_sum < min_sum or macro_sum > 1050:
+                # RECALIBRAÇÃO: Rações secas possuem 25-40% de Carboidratos (NFE) não medidos.
+                # A soma de Protein+Fat+Fiber+Ash+Moisture deve estar entre 600 e 1050 g/kg.
+                # Valores abaixo de 600 indicam falta de dados ou erro grave de escala.
+                min_sum = 600.0 
+                
+                if macro_sum < min_sum or macro_sum > 1050.0:
                     print(f"[BIOLOGICAL AUDIT] Falha no balanço de massa ({macro_sum}g/kg) no produto {product_id}.")
                     for m in macros_all:
                         df.at[index, m] = np.nan

@@ -50,9 +50,9 @@ def test_magnesium_unit_mapping_bug(engine):
 
 def test_mass_balance_recalibration(engine):
     """
-    Relatório Item 6: Balanço de massa recalibrado (800-1050 g/kg).
+    Relatório Item 6: Balanço de massa recalibrado para considerar NFE (600-1050 g/kg).
     """
-    # Soma: 320+80+104+91+110 = 705 (Falha)
+    # Soma: 320+80+104+91+110 = 705 (Agora deve passar para acomodar NFE)
     data = pd.DataFrame({
         "product_id": [1],
         "protein_gkg": [320.0],
@@ -62,8 +62,8 @@ def test_mass_balance_recalibration(engine):
         "moisture_gkg": [110.0]
     })
     df, _ = engine.normalize_dataframe(data)
-    assert pd.isna(df.at[0, "protein_gkg"])
-    assert df.at[0, "protein_gkg_status"] == ValidationStatus.PRODUCT_MASS_BALANCE_FAILED
+    assert pd.notna(df.at[0, "protein_gkg"])
+    assert df.at[0, "protein_gkg_status"] != ValidationStatus.PRODUCT_MASS_BALANCE_FAILED
 
 def test_energy_recording_fix(engine):
     """
