@@ -20,8 +20,10 @@ from app.normalization.rules import (
 
 class NormalizationEngine:
     """
-    Engine responsável por aplicar a normalização
-    dos nutrientes em DataFrames e Series.
+    Motor principal de normalização nutricional.
+    
+    Responsável por coordenar a resolução de escalas, conversão de unidades 
+    e aplicação de auditorias biológicas em conjuntos de dados de produtos.
     """
 
     def __init__(self) -> None:
@@ -36,10 +38,13 @@ class NormalizationEngine:
         report: DatasetNormalizationReport,
         product_id_column: str,
     ) -> None:
+        """
+        Normaliza individualmente cada campo nutricional de uma linha do DataFrame.
+        """
         product_id = row.get(product_id_column, -1)
         row_changed = False
 
-        # Identifica se o produto é petisco ou suplemento (Relatório Item 3.3)
+        # Identifica categorias especiais que possuem limites biológicos diferenciados
         product_category = str(row.get("product_category", "")).lower()
         is_treat_or_supp = any(x in product_category for x in ["petisco", "snack", "suplemento", "complementar"])
 
@@ -48,11 +53,13 @@ class NormalizationEngine:
             if rule is None:
                 continue
 
+            # Mapeamento dinâmico da coluna de unidade original
             original_unit = None
             unit_col_full = f"{field}_unit"
             base_name = field.split('_')[0]
             unit_col_base = f"{base_name}_unit"
             unit_col_special = None
+            
             if "_min_" in field:
                 unit_col_special = f"{base_name}_min_unit"
             elif "_max_" in field:
@@ -69,6 +76,7 @@ class NormalizationEngine:
 
             current_value = row.get(field)
             
+            # Executa a resolução lógica do valor (unidade + escala)
             result = self.resolver.resolve_value(
                 value=current_value,
                 rule=rule,
@@ -76,14 +84,20 @@ class NormalizationEngine:
                 is_treat_or_supp=is_treat_or_supp
             )
 
+            # Atualiza o DataFrame com os resultados da normalização e auditoria
             df.at[index, field] = result.normalized_value
             df.at[index, f"{field}_original"] = result.original_value
             df.at[index, f"{field}_unit"] = result.original_unit
             df.at[index, f"{field}_status"] = result.status
             df.at[index, f"{field}_rule"] = result.rule_applied
-            # result.reason não existe em NormalizationResult, deve ser extraído do log ou status
-            df.at[index, f"{field}_reason"] = result.status if result.status in [ValidationStatus.IMPLAUSIBLE, ValidationStatus.AMBIGUOUS] else None
+            df.at[index, f"{field}_reason"] = result.status if result.status in [
+                ValidationStatus.IMPLAUSIBLE, 
+                ValidationStatus.AMBIGUOUS,
+                ValidationStatus.BIOLOGICALLY_IMPLAUSIBLE_SOURCE,
+                ValidationStatus.BIOLOGICALLY_IMPLAUSIBLE_ENERGY
+            ] else None
 
+            # Registra no relatório de execução
             report.add_log(
                 NormalizationLog(
                     product_id=product_id,
@@ -108,16 +122,21 @@ class NormalizationEngine:
         else:
             report.unchanged_records += 1
             
+        # Após normalizar campos individuais, aplica validações cruzadas (Balanço de Massa, Ca:P)
         self._audit_biological_coherence(df, index, product_id)
 
     def _audit_biological_coherence(self, df: pd.DataFrame, index: int, product_id: Any) -> None:
         """
-        Realiza validações cruzadas rigorosas para garantir a integridade biológica do produto.
+        Validações biológicas cruzadas:
+        1. Consistência de limites (Min vs Max).
+        2. Balanço de Massa (Soma de proximais entre 800-1050 g/kg).
+        3. Razão Cálcio:Fósforo (Idealmente entre 1:1 e 2:1).
+        4. Verificação de toxicidade/insignificância para microminerais.
         """
-        # Identifica se o produto é petisco ou suplemento (Relatório Item 3.3)
         product_category = str(df.at[index, "product_category"]).lower() if "product_category" in df.columns else ""
         is_treat_or_supp = any(x in product_category for x in ["petisco", "snack", "suplemento", "complementar"])
 
+        # Garante existência das colunas necessárias para o cálculo
         required_cols = [
             "protein_gkg", "fat_gkg", "fiber_gkg", "ash_gkg", "moisture_gkg",
             "calcium_min_mgkg", "calcium_max_mgkg", "phosphorus_mgkg",
@@ -127,24 +146,20 @@ class NormalizationEngine:
             if col not in df.columns:
                 df[col] = None
         
-        # 1. Inversão Mínimo vs Máximo (Cálcio)
+        # 1. Inversão Mínimo vs Máximo
         ca_min = df.at[index, "calcium_min_mgkg"]
         ca_max = df.at[index, "calcium_max_mgkg"]
         if pd.notna(ca_min) and pd.notna(ca_max) and ca_min > ca_max:
             df.at[index, "calcium_min_mgkg"], df.at[index, "calcium_max_mgkg"] = ca_max, ca_min
 
-        # 2.1 Prioridade 2.1: Soma dos nutrientes proximais (850–1050 g/kg)
-        # Para petiscos/suplementos, o balanço de massa pode ser diferente, então ignoramos (Relatório Item 3.3)
+        # 2. Balanço de Massa (Ignorado para Petiscos/Suplementos)
         if not is_treat_or_supp:
             macros_all = ["protein_gkg", "fat_gkg", "fiber_gkg", "ash_gkg", "moisture_gkg"]
             present_macros = [m for m in macros_all if pd.notna(df.at[index, m])]
             
-            # Recalibração: Validar se tivermos pelo menos 4 macronutrientes.
-            # Faixa ajustada para 800-1050 g/kg para acomodar variações naturais e erros leves de arredondamento.
+            # Aplica barreira se houver dados suficientes (>= 4 macros)
             if len(present_macros) >= 4:
-                # Converter para float para evitar problemas com tipos do pandas
                 macro_sum = sum(float(df.at[index, m]) for m in present_macros)
-                # Se faltar um macro, a soma mínima esperada cai proporcionalmente
                 min_sum = 800 if len(present_macros) == 5 else 600 
                 
                 if macro_sum < min_sum or macro_sum > 1050:
@@ -154,22 +169,21 @@ class NormalizationEngine:
                         df.at[index, f"{m}_status"] = ValidationStatus.PRODUCT_MASS_BALANCE_FAILED
                         df.at[index, f"{m}_reason"] = f"Mass balance failed: {macro_sum}g/kg"
                     
-                    # Se falhar o balanço de massa, a energia também deve ser anulada
+                    # Anula energia em caso de falha grave no balanço de massa
                     df.at[index, "metabolizable_energy_kcalkg"] = None
                     df.at[index, "metabolizable_energy_kcalkg_status"] = ValidationStatus.PRODUCT_MASS_BALANCE_FAILED
                     df.at[index, "metabolizable_energy_kcalkg_reason"] = f"Mass balance failed: {macro_sum}g/kg"
                     return 
 
-        # 2.2 Prioridade 2.2: Relação Cálcio:Fósforo (1:1 até 2:1)
+        # 3. Razão Cálcio:Fósforo
         p = df.at[index, "phosphorus_mgkg"]
         ca_min_val = df.at[index, "calcium_min_mgkg"]
         ca_max_val = df.at[index, "calcium_max_mgkg"]
         
-        # Só valida se ambos estiverem presentes. Se apenas um estiver, não podemos calcular a razão.
         if pd.notna(p) and (pd.notna(ca_min_val) or pd.notna(ca_max_val)) and p > 0:
             ca = ca_min_val if pd.notna(ca_min_val) else ca_max_val
             ratio = ca / p
-            if ratio < 1.0 or ratio > 2.0: # Retornando para 1.0-2.0 conforme requisito original, mas com tolerância no teste se necessário
+            if ratio < 1.0 or ratio > 2.0:
                 print(f"[BIOLOGICAL AUDIT] Razão Ca:P inválida ({ratio:.2f}) no produto {product_id}.")
                 reason = f"Invalid Ca:P ratio: {ratio:.2f}"
                 for field in ["calcium_min_mgkg", "calcium_max_mgkg", "phosphorus_mgkg"]:
@@ -177,20 +191,19 @@ class NormalizationEngine:
                     df.at[index, f"{field}_reason"] = reason
                     df.at[index, field] = None
 
-        # 3. Limites de Micronutrientes (Prioridade 4)
-        # Reforça limites biológicos para todos os minerais
-        # Para petiscos/suplementos, permitimos até 3x o limite máximo (Relatório Item 3.3)
+        # 4. Limites Biológicos para Microminerais
         multiplier = 3.0 if is_treat_or_supp else 1.0
+        minerals = ["sodium_mgkg", "potassium_mgkg", "magnesium_mgkg", "zinc_mgkg", "copper_mgkg", "selenium_mgkg", "iodine_mgkg", "manganese_mgkg"]
         
-        for mineral in ["sodium_mgkg", "potassium_mgkg", "magnesium_mgkg", "zinc_mgkg", "copper_mgkg", "selenium_mgkg", "iodine_mgkg", "manganese_mgkg"]:
+        for mineral in minerals:
             if mineral in df.columns:
                 val = df.at[index, mineral]
                 if pd.notna(val):
                     rule = get_rule(mineral)
                     if rule and (val < rule.target_min or val > (rule.target_max * multiplier)):
-                        print(f"[BIOLOGICAL AUDIT] Micronutriente fora da faixa ({'treat' if is_treat_or_supp else 'standard'}): {mineral}={val}")
+                        print(f"[BIOLOGICAL AUDIT] Mineral fora da faixa: {mineral}={val}")
                         df.at[index, f"{mineral}_status"] = ValidationStatus.IMPLAUSIBLE
-                        df.at[index, f"{mineral}_reason"] = f"Biological limit exceeded: {val} (range: {rule.target_min}-{rule.target_max * multiplier})"
+                        df.at[index, f"{mineral}_reason"] = f"Biological limit exceeded: {val}"
                         df.at[index, mineral] = None
 
     def normalize_dataframe(
@@ -198,16 +211,13 @@ class NormalizationEngine:
         df: pd.DataFrame,
         product_id_column: str = "product_id",
     ) -> tuple[pd.DataFrame, DatasetNormalizationReport]:
-
+        """
+        Normaliza um DataFrame completo.
+        """
         df = df.copy()
         report = DatasetNormalizationReport()
 
-        fields = [
-            field
-            for field
-            in NORMALIZABLE_FIELDS
-            if field in df.columns
-        ]
+        fields = [field for field in NORMALIZABLE_FIELDS if field in df.columns]
 
         for index, row in df.iterrows():
             report.processed_records += 1
@@ -228,24 +238,16 @@ class NormalizationEngine:
         columns: Iterable[str] | None = None,
         product_id_column: str = "product_id",
     ) -> tuple[pd.DataFrame, DatasetNormalizationReport]:
-
+        """
+        Normaliza apenas colunas específicas de um DataFrame.
+        """
         df = df.copy()
         report = DatasetNormalizationReport()
 
         if columns is None:
-            fields = [
-                field
-                for field
-                in NORMALIZABLE_FIELDS
-                if field in df.columns
-            ]
+            fields = [field for field in NORMALIZABLE_FIELDS if field in df.columns]
         else:
-            fields = [
-                field
-                for field
-                in columns
-                if field in df.columns
-            ]
+            fields = [field for field in columns if field in df.columns]
 
         for index, row in df.iterrows():
             report.processed_records += 1
@@ -265,7 +267,9 @@ class NormalizationEngine:
         series: pd.Series,
         field: str,
     ) -> pd.Series:
-
+        """
+        Normaliza uma Series individual.
+        """
         rule = get_rule(field)
         if rule is None:
             return series.copy()
@@ -288,7 +292,9 @@ class NormalizationEngine:
         report: DatasetNormalizationReport,
         status: ValidationStatus,
     ) -> None:
-
+        """
+        Atualiza as métricas de execução no relatório.
+        """
         if status == ValidationStatus.NORMALIZED:
             return
 
@@ -298,14 +304,22 @@ class NormalizationEngine:
             report.manual_review_records += 1
         elif status == ValidationStatus.AMBIGUOUS:
             report.ambiguous_records += 1
-        elif status in [ValidationStatus.IMPLAUSIBLE, ValidationStatus.BIOLOGICALLY_IMPLAUSIBLE_SOURCE, ValidationStatus.BIOLOGICALLY_IMPLAUSIBLE_ENERGY]:
+        elif status in [
+            ValidationStatus.IMPLAUSIBLE, 
+            ValidationStatus.BIOLOGICALLY_IMPLAUSIBLE_SOURCE, 
+            ValidationStatus.BIOLOGICALLY_IMPLAUSIBLE_ENERGY,
+            ValidationStatus.PRODUCT_MASS_BALANCE_FAILED,
+            ValidationStatus.INVALID_CA_P_RATIO
+        ]:
             report.implausible_records += 1
 
     @staticmethod
     def generate_logs_dataframe(
         report: DatasetNormalizationReport,
     ) -> pd.DataFrame:
-
+        """
+        Converte os logs do relatório em um DataFrame para exportação.
+        """
         if not report.logs:
             return pd.DataFrame()
 

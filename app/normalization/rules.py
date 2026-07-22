@@ -6,29 +6,27 @@ from app.normalization.models import (
 )
 
 # ==========================================================
-# Fatores de conversão
+# Constantes de Conversão
 # ==========================================================
 
 GKG_TO_MGKG_FACTOR = 1000.0
-
 PERCENT_TO_GKG_FACTOR = 10.0
-
 PERCENT_TO_MGKG_FACTOR = 10000.0
 
 
 # ==========================================================
-# Regras de Normalização
+# Configuração de Regras por Nutriente
 # ==========================================================
 
 NORMALIZATION_RULES: dict[str, NormalizationRule] = {
 
     # ------------------------------------------------------
-    # Macronutrientes
+    # Macronutrientes (Unidade Alvo: g/kg)
     # ------------------------------------------------------
 
     "protein_gkg": NormalizationRule(
         field="protein_gkg",
-        target_min=0.1, # Reduzido para aceitar petiscos de baixa proteína
+        target_min=0.1, 
         target_max=600,
         overscale_factor=10,
         decimal_shift_factor=10,
@@ -37,7 +35,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
 
     "fat_gkg": NormalizationRule(
         field="fat_gkg",
-        target_min=0.01, # Reduzido de 20 para 0.01 para aceitar conversões de mg/kg para g/kg (Relatório Item 🆕)
+        target_min=0.01,
         target_max=1000,
         overscale_factor=10,
         decimal_shift_factor=10,
@@ -56,7 +54,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     "ash_gkg": NormalizationRule(
         field="ash_gkg",
         target_min=10,
-        target_max=150, # Reduzido de 1000 para 150 (15%) conforme relatório item 3
+        target_max=150, 
         overscale_factor=10,
         decimal_shift_factor=10,
         percent_factor=PERCENT_TO_GKG_FACTOR,
@@ -72,7 +70,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     ),
 
     # ------------------------------------------------------
-    # Minerais
+    # Minerais (Unidade Alvo: mg/kg)
     # ------------------------------------------------------
 
     "calcium_min_mgkg": NormalizationRule(
@@ -99,7 +97,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
 
     "phosphorus_mgkg": NormalizationRule(
         field="phosphorus_mgkg",
-        target_min=100, # Reduzido de 500 para 100 para aceitar valores como 400 mg/kg (Relatório Item 1)
+        target_min=100, 
         target_max=40000,
         overscale_factor=10,
         decimal_shift_factor=100,
@@ -110,7 +108,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
 
     "sodium_mgkg": NormalizationRule(
         field="sodium_mgkg",
-        target_min=100, # Reduzido de 800 para 100 para aceitar valores como 300 mg/kg (Relatório Item 1)
+        target_min=100, 
         target_max=30000,
         overscale_factor=10,
         decimal_shift_factor=100,
@@ -121,7 +119,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
 
     "potassium_mgkg": NormalizationRule(
         field="potassium_mgkg",
-        target_min=100, # Reduzido de 1500 para 100 para aceitar valores baixos plausíveis (Relatório Item 1)
+        target_min=100, 
         target_max=50000,
         overscale_factor=10,
         decimal_shift_factor=100,
@@ -131,20 +129,20 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     ),
 
     # ------------------------------------------------------
-    # Energia
+    # Energia (Unidade Alvo: kcal/kg)
     # ------------------------------------------------------
 
     "metabolizable_energy_kcalkg": NormalizationRule(
         field="metabolizable_energy_kcalkg",
         target_min=500,
-        target_max=4500, # Reduzido de 9000 para 4500 para capturar outliers como 4810 kcal/kg
+        target_max=4500, 
         overscale_factor=10,
         decimal_shift_factor=1000,
         percent_factor=10000,
     ),
 
     # ------------------------------------------------------
-    # Aminoácidos (mg/kg)
+    # Aminoácidos (Unidade Alvo: mg/kg)
     # ------------------------------------------------------
     "lysine_mgkg": NormalizationRule(
         field="lysine_mgkg",
@@ -190,7 +188,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     ),
 
     # ------------------------------------------------------
-    # Ácidos Graxos (mg/kg ou g/kg)
+    # Ácidos Graxos (Unidade Alvo: mg/kg)
     # ------------------------------------------------------
     "omega_3_mgkg": NormalizationRule(
         field="omega_3_mgkg",
@@ -215,7 +213,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     ),
 
     # ------------------------------------------------------
-    # Microminerais (mg/kg)
+    # Microminerais (Unidade Alvo: mg/kg)
     # ------------------------------------------------------
     "magnesium_mgkg": NormalizationRule(
         field="magnesium_mgkg",
@@ -251,7 +249,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     ),
     "selenium_mgkg": NormalizationRule(
         field="selenium_mgkg",
-        target_min=0.01, # Reduzido de 0.05 para 0.01 para aceitar valores como 0.04 mg/kg
+        target_min=0.01,
         target_max=5,
         decimal_shift_up=1,
     ),
@@ -269,7 +267,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     ),
 
     # ------------------------------------------------------
-    # Vitaminas (UI/kg ou mg/kg)
+    # Vitaminas (Unidade Alvo: UI/kg ou mg/kg)
     # ------------------------------------------------------
     "vitamin_a_uikg": NormalizationRule(
         field="vitamin_a_uikg",
@@ -311,12 +309,12 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         field="vitamin_b12_mgkg",
         target_min=0.005,
         target_max=1.0,
-        decimal_shift_up=0.001, # Converte mcg para mg
+        decimal_shift_up=0.001,
     ),
     "niacin_mgkg": NormalizationRule(
         field="niacin_mgkg",
         target_min=10,
-        target_max=300, # Reduzido de 500 para 300 para capturar outliers de ~495 mg/kg
+        target_max=300, 
         decimal_shift_up=1,
     ),
     "pantothenic_acid_mgkg": NormalizationRule(
@@ -334,7 +332,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     "biotin_mgkg": NormalizationRule(
         field="biotin_mgkg",
         target_min=0.01,
-        target_max=5, # Aumentado de 2 para 5 para aceitar valores plausíveis como 2.03 mg/kg
+        target_max=5,
         decimal_shift_up=1,
     ),
     "choline_mgkg": NormalizationRule(
@@ -357,7 +355,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     ),
 
     # ------------------------------------------------------
-    # Outros
+    # Outros (mg/kg)
     # ------------------------------------------------------
     "beta_glucans_mgkg": NormalizationRule(
         field="beta_glucans_mgkg",
@@ -375,93 +373,11 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     ),
 }
 
-# ==========================================================
-# Agrupamentos
-# ==========================================================
-
-MACRONUTRIENTS = (
-    "protein_gkg",
-    "fat_gkg",
-    "fiber_gkg",
-    "ash_gkg",
-    "moisture_gkg",
-)
-
-MINERALS = (
-    "calcium_min_mgkg",
-    "calcium_max_mgkg",
-    "phosphorus_mgkg",
-    "sodium_mgkg",
-    "potassium_mgkg",
-    "magnesium_mgkg",
-    "chlorine_mgkg",
-    "iron_mgkg",
-    "zinc_mgkg",
-    "copper_mgkg",
-    "selenium_mgkg",
-    "iodine_mgkg",
-    "manganese_mgkg",
-)
-
-AMINO_ACIDS = (
-    "lysine_mgkg",
-    "methionine_mgkg",
-    "tryptophan_mgkg",
-    "arginine_mgkg",
-    "taurine_mgkg",
-    "l_carnitine_mgkg",
-)
-
-FATTY_ACIDS = (
-    "omega_3_mgkg",
-    "omega_6_mgkg",
-    "epa_dha_mgkg",
-)
-
-VITAMINS = (
-    "vitamin_a_uikg",
-    "vitamin_d3_uikg",
-    "vitamin_e_uikg",
-    "vitamin_b1_mgkg",
-    "vitamin_b2_mgkg",
-    "vitamin_b6_mgkg",
-    "vitamin_b12_mgkg",
-    "niacin_mgkg",
-    "pantothenic_acid_mgkg",
-    "folic_acid_mgkg",
-    "biotin_mgkg",
-    "choline_mgkg",
-    "vitamin_c_mgkg",
-    "vitamin_k3_mgkg",
-)
-
-ENERGY = (
-    "metabolizable_energy_kcalkg",
-)
-
 NORMALIZABLE_FIELDS = tuple(NORMALIZATION_RULES.keys())
 
 
 # ==========================================================
-# Prioridade das regras
-# ==========================================================
-
-RULE_PRIORITY = [
-    "already_normalized",
-    "overscale",
-    "decimal_shift",
-    "percent_conversion",
-    "gkg_to_mgkg",
-    "unit_direct_percent_to_gkg",
-    "unit_direct_percent_to_mgkg",
-    "unit_direct_gkg_to_mgkg",
-    "unit_direct_already_gkg",
-    "unit_direct_already_mgkg",
-]
-
-
-# ==========================================================
-# Confiança atribuída
+# Configuração de Confiança e Prioridade
 # ==========================================================
 
 RULE_CONFIDENCE = {
@@ -482,37 +398,12 @@ RULE_CONFIDENCE = {
 
 
 # ==========================================================
-# Categorias de Qualidade
-# ==========================================================
-
-QUALITY_STATUS = {
-    ValidationStatus.NORMALIZED: "Normalizado",
-    ValidationStatus.AUTO_CORRECTED: "Corrigido automaticamente",
-    ValidationStatus.REVIEW: "Requer revisão manual",
-    ValidationStatus.AMBIGUOUS: "Ambíguo",
-    ValidationStatus.IMPLAUSIBLE: "Implausível",
-    ValidationStatus.MISSING: "Sem informação",
-}
-
-
-# ==========================================================
-# Helpers
+# Helpers de Acesso
 # ==========================================================
 
 def get_rule(field: str) -> NormalizationRule | None:
     return NORMALIZATION_RULES.get(field)
 
-def has_rule(field: str) -> bool:
-    return field in NORMALIZATION_RULES
-
-def is_macro(field: str) -> bool:
-    return field in MACRONUTRIENTS
-
-def is_mineral(field: str) -> bool:
-    return field in MINERALS
 
 def get_confidence(rule_name: str) -> float:
-    return RULE_CONFIDENCE.get(rule_name, 0.0)
-
-def quality_label(status: ValidationStatus) -> str:
-    return QUALITY_STATUS.get(status, "Desconhecido")
+    return RULE_CONFIDENCE.get(rule_name, 0.5)
