@@ -1,10 +1,13 @@
-*.pyc
-*.csv
-*.json
-*.pbix
+# Dados gerados pelo pipeline
+output/
+data/temp/
 
-# Pasta de design
+# Power BI
+*.pbix
+*.pbix.autosave
 docs/Design_PBI/
 
-# arquivos temporários do Power BI
-*.pbix.autosave
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
