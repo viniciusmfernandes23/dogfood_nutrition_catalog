@@ -136,15 +136,16 @@ class NormalizationEngine:
         if not is_treat_or_supp:
             macros_all = ["protein_gkg", "fat_gkg", "fiber_gkg", "ash_gkg", "moisture_gkg"]
             present_macros = [m for m in macros_all if pd.notna(df.at[index, m])]
-            macro_sum = sum(df.at[index, m] for m in present_macros)
             
-            # Só valida se tivermos um conjunto representativo de macronutrientes (pelo menos 3)
-            # para evitar anular linhas onde apenas a proteína foi extraída, por exemplo.
-            if len(present_macros) >= 3:
+            # Só valida se tivermos o conjunto COMPLETO de macronutrientes (todos os 5)
+            # para evitar anular linhas onde a soma é baixa apenas porque faltam dados (ex: cinzas ou umidade não informadas)
+            if len(present_macros) == 5:
+                macro_sum = sum(df.at[index, m] for m in present_macros)
                 if macro_sum < 850 or macro_sum > 1050:
                     print(f"[BIOLOGICAL AUDIT] Falha no balanço de massa ({macro_sum}g/kg) no produto {product_id}.")
                     for m in macros_all:
                         df.at[index, f"{m}_status"] = ValidationStatus.PRODUCT_MASS_BALANCE_FAILED
+                        df.at[index, f"{m}_reason"] = f"Mass balance failed: {macro_sum}g/kg"
                         df.at[index, m] = None
                     df.at[index, "metabolizable_energy_kcalkg"] = None
                     return 
@@ -159,9 +160,13 @@ class NormalizationEngine:
             ratio = ca / p
             if ratio < 1.0 or ratio > 2.0:
                 print(f"[BIOLOGICAL AUDIT] Razão Ca:P inválida ({ratio:.2f}) no produto {product_id}.")
+                reason = f"Invalid Ca:P ratio: {ratio:.2f}"
                 df.at[index, "calcium_min_mgkg_status"] = ValidationStatus.INVALID_CA_P_RATIO
+                df.at[index, "calcium_min_mgkg_reason"] = reason
                 df.at[index, "calcium_max_mgkg_status"] = ValidationStatus.INVALID_CA_P_RATIO
+                df.at[index, "calcium_max_mgkg_reason"] = reason
                 df.at[index, "phosphorus_mgkg_status"] = ValidationStatus.INVALID_CA_P_RATIO
+                df.at[index, "phosphorus_mgkg_reason"] = reason
                 df.at[index, "calcium_min_mgkg"] = None
                 df.at[index, "calcium_max_mgkg"] = None
                 df.at[index, "phosphorus_mgkg"] = None
@@ -179,6 +184,7 @@ class NormalizationEngine:
                     if rule and (val < rule.target_min or val > (rule.target_max * multiplier)):
                         print(f"[BIOLOGICAL AUDIT] Micronutriente fora da faixa ({'treat' if is_treat_or_supp else 'standard'}): {mineral}={val}")
                         df.at[index, f"{mineral}_status"] = ValidationStatus.IMPLAUSIBLE
+                        df.at[index, f"{mineral}_reason"] = f"Biological limit exceeded: {val} (range: {rule.target_min}-{rule.target_max * multiplier})"
                         df.at[index, mineral] = None
 
     def normalize_dataframe(

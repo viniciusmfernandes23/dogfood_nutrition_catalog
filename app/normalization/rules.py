@@ -251,7 +251,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     ),
     "selenium_mgkg": NormalizationRule(
         field="selenium_mgkg",
-        target_min=0.05,
+        target_min=0.01, # Reduzido de 0.05 para 0.01 para aceitar valores como 0.04 mg/kg
         target_max=5,
         decimal_shift_up=1,
     ),
@@ -334,7 +334,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     "biotin_mgkg": NormalizationRule(
         field="biotin_mgkg",
         target_min=0.01,
-        target_max=2,
+        target_max=5, # Aumentado de 2 para 5 para aceitar valores plausíveis como 2.03 mg/kg
         decimal_shift_up=1,
     ),
     "choline_mgkg": NormalizationRule(

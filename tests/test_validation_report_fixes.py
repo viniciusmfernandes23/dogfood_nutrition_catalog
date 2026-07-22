@@ -76,13 +76,15 @@ def test_item_3_3_treats_exemption(engine):
         "product_id": [1, 2],
         "product_category": ["Ração Seca", "Petisco para Cães"],
         "protein_gkg": [700.0, 700.0], # Acima do teto de 600
+        "fat_gkg": [100.0, 100.0],
+        "fiber_gkg": [50.0, 50.0],
         "ash_gkg": [200.0, 200.0],    # Acima do teto de 150
         "moisture_gkg": [100.0, 100.0]
     })
     
     df, report = engine.normalize_dataframe(data)
     
-    # Produto 1 (Ração) -> Deve falhar no mass balance ou limites
+    # Produto 1 (Ração) -> Deve falhar no mass balance (700+100+50+200+100 = 1150)
     assert pd.isna(df.at[0, "protein_gkg"])
     
     # Produto 2 (Petisco) -> Deve passar (limites flexibilizados ou mass balance ignorado)
