@@ -1,3 +1,10 @@
 *.pyc
 *.csv
 *.json
+*.pbix
+
+# Pasta de design
+docs/Design_PBI/
+
+# arquivos temporários do Power BI
+*.pbix.autosave
