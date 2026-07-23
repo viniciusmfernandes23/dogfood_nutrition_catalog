@@ -161,22 +161,31 @@ class NormalizationEngine:
             if len(present_macros) >= 4:
                 macro_sum = float(sum(float(df.at[index, m]) for m in present_macros))
                 
-                # RECALIBRAÇÃO: Rações secas possuem 25-40% de Carboidratos (NFE) não medidos.
-                # A soma de Protein+Fat+Fiber+Ash+Moisture deve estar entre 600 e 1050 g/kg.
-                # Valores abaixo de 600 indicam falta de dados ou erro grave de escala.
-                min_sum = 600.0 
+                # v1.4.0: RECALIBRAÇÃO CRÍTICA
+                # Proteína + Gordura + Fibra + Cinzas + Umidade devem ficar aproximadamente entre 850 e 1050 g/kg.
+                # Acima disso ou abaixo de 850 (para rações completas), marcar para auditoria.
+                min_sum = 850.0
+                max_sum = 1050.0
                 
-                if macro_sum < min_sum or macro_sum > 1050.0:
+                if macro_sum < min_sum or macro_sum > max_sum:
                     print(f"[BIOLOGICAL AUDIT] Falha no balanço de massa ({macro_sum}g/kg) no produto {product_id}.")
                     for m in macros_all:
-                        df.at[index, m] = np.nan
-                        df.at[index, f"{m}_status"] = ValidationStatus.PRODUCT_MASS_BALANCE_FAILED
-                        df.at[index, f"{m}_reason"] = f"Mass balance failed: {macro_sum}g/kg"
+                        # Em vez de anular imediatamente (np.nan), marcamos para auditoria
+                        # se estiver próximo ou se for erro de escala. 
+                        # Se for > 1050, é erro crítico.
+                        df.at[index, f"{m}_status"] = ValidationStatus.REVIEW if macro_sum < max_sum else ValidationStatus.PRODUCT_MASS_BALANCE_FAILED
+                        df.at[index, f"{m}_reason"] = f"Mass balance audit required: {macro_sum}g/kg (Expected {min_sum}-{max_sum})"
+                        if macro_sum > max_sum:
+                            df.at[index, m] = np.nan
                     
-                    # Anula energia em caso de falha grave no balanço de massa
-                    df.at[index, "metabolizable_energy_kcalkg"] = None
-                    df.at[index, "metabolizable_energy_kcalkg_status"] = ValidationStatus.PRODUCT_MASS_BALANCE_FAILED
-                    df.at[index, "metabolizable_energy_kcalkg_reason"] = f"Mass balance failed: {macro_sum}g/kg"
+                    # Anula energia em caso de falha grave no balanço de massa (> 1050)
+                    if macro_sum > max_sum:
+                        df.at[index, "metabolizable_energy_kcalkg"] = None
+                        df.at[index, "metabolizable_energy_kcalkg_status"] = ValidationStatus.PRODUCT_MASS_BALANCE_FAILED
+                        df.at[index, "metabolizable_energy_kcalkg_reason"] = f"Mass balance failed: {macro_sum}g/kg"
+                    else:
+                        df.at[index, "metabolizable_energy_kcalkg_status"] = ValidationStatus.REVIEW
+                        df.at[index, "metabolizable_energy_kcalkg_reason"] = f"Mass balance audit required: {macro_sum}g/kg"
                     return 
 
         # 3. Razão Cálcio:Fósforo

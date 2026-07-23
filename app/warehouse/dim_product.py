@@ -23,6 +23,15 @@ class ProductDimensionBuilder:
         "breed_size",
         "protein_source",
         "clinical_category",
+        "product_type",
+        "package_weight",
+        "contains_coloring",
+        "target_breeds",
+        "indication",
+        "product_line",
+        "is_transgenic",
+        "gender",
+        "image_url",
     )
 
     NUTRIENT_SUFFIXES = (
@@ -72,6 +81,17 @@ class ProductDimensionBuilder:
                 protein_source=row.get("protein_source"),
 
                 clinical_category=row.get("clinical_category"),
+                
+                # v1.4.0: Mapeamento da Ficha Técnica
+                product_type=row.get("product_type"),
+                package_weight=row.get("package_weight"),
+                contains_coloring=row.get("contains_coloring"),
+                target_breeds=row.get("target_breeds"),
+                indication=row.get("indication"),
+                product_line=row.get("product_line"),
+                is_transgenic=row.get("is_transgenic"),
+                gender=row.get("gender"),
+                image_url=row.get("image_url"),
 
                 has_guarantee_levels=self._has_guarantee_levels(
                     row,

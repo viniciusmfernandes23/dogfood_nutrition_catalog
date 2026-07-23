@@ -51,18 +51,17 @@ class Resolver:
                 return nutrient
 
         # Barreira 2: Proteção contra valores astronômicos (outliers extremos)
+        # v1.4.0: Ajustado para 100.000 para não interferir em correções de 10x de valores menores
         if nutrient.value > 100_000:
             for factor in [10000.0, 1000.0, 10.0]:
-                test_val = nutrient.value
-                for _ in range(4):
-                    test_val /= factor
-                    if self.validator.is_valid(test_val, rule):
-                        nutrient.original_value = nutrient.value
-                        nutrient.value = round(float(test_val), 2)
-                        nutrient.status = ValidationStatus.AUTO_CORRECTED
-                        nutrient.rule_applied = f"fix_accumulated_scale_{int(factor)}"
-                        nutrient.confidence = 1.0
-                        return nutrient
+                test_val = nutrient.value / factor
+                if self.validator.is_valid(test_val, rule):
+                    nutrient.original_value = nutrient.value
+                    nutrient.value = round(float(test_val), 2)
+                    nutrient.status = ValidationStatus.AUTO_CORRECTED
+                    nutrient.rule_applied = f"fix_scale_{int(factor)}x"
+                    nutrient.confidence = 1.0
+                    return nutrient
             
             nutrient.original_value = nutrient.value
             nutrient.value = None
@@ -127,11 +126,13 @@ class Resolver:
                 return nutrient
 
         # Caso Ideal: Unidade já correta e valor válido
-        if nutrient.original_unit == nutrient.unit and self.validator.is_valid(nutrient.value, rule):
-            nutrient.status = ValidationStatus.NORMALIZED
-            nutrient.rule_applied = "already_normalized"
-            nutrient.confidence = get_confidence("already_normalized")
-            return nutrient
+        # v1.4.0: Removido 'already_normalized' como retorno imediato para garantir que passe 
+        # por todas as validações biológicas e heurísticas de escala no Resolver.
+        # if nutrient.original_unit == nutrient.unit and self.validator.is_valid(nutrient.value, rule):
+        #     nutrient.status = ValidationStatus.NORMALIZED
+        #     nutrient.rule_applied = "already_normalized"
+        #     nutrient.confidence = get_confidence("already_normalized")
+        #     return nutrient
 
         # Fluxo de Conversão por Unidade Explícita
         if nutrient.original_unit:
@@ -149,14 +150,15 @@ class Resolver:
                     nutrient.rule_applied = f"unit_direct_{rule_name}"
                     nutrient.confidence = 1.0
                     return nutrient
-                else:
-                    # Se a conversão explícita gera um valor inválido, o dado é incoerente
-                    nutrient.original_value = nutrient.value
-                    nutrient.value = None
-                    nutrient.status = ValidationStatus.IMPLAUSIBLE
-                    nutrient.rule_applied = f"invalid_conversion_{rule_name}"
-                    nutrient.confidence = 0.0
-                    return nutrient
+                # v1.4.0: Se a unidade explícita falha na validação biológica,
+                # NÃO anulamos imediatamente. Permitimos que o fluxo siga para as
+                # heurísticas de escala (ex: 1200 g/kg -> 120 g/kg).
+                # nutrient.original_value = nutrient.value
+                # nutrient.value = None
+                # nutrient.status = ValidationStatus.IMPLAUSIBLE
+                # nutrient.rule_applied = f"invalid_conversion_{rule_name}"
+                # nutrient.confidence = 0.0
+                # return nutrient
 
         # Fallback 1: Valor sem unidade mas já válido
         if self.validator.is_valid(nutrient.value, rule):
@@ -261,6 +263,10 @@ class Resolver:
                 return round(value * 10.0, 2), "kcal100g_to_kcalkg"
             elif unit == "mj/kg":
                 return round(value * 239.006, 2), "mjkg_to_kcalkg"
+            elif unit == "kcal/sache":
+                # v1.4.0: Suporte a sachês (base 85g conforme pedido do usuário)
+                # 72 kcal / 85g -> (72/85) * 1000 = 847.05 kcal/kg
+                return round((value / 85.0) * 1000.0, 2), "kcalsache_to_kcalkg"
             else:
                 return None, "invalid_energy_unit"
 

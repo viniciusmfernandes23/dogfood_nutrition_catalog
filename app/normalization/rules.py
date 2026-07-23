@@ -135,7 +135,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     "metabolizable_energy_kcalkg": NormalizationRule(
         field="metabolizable_energy_kcalkg",
         target_min=500,
-        target_max=4500, 
+        target_max=9000, 
         overscale_factor=10,
         decimal_shift_factor=1000,
         percent_factor=10000,

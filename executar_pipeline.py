@@ -147,17 +147,55 @@ def run_extraction():
                     "available": False, "marketplace": p.marketplace
                 }]
 
+            # v1.4.0: Extração de campos da Ficha Técnica e Imagem do api_payload
+            specifications = {}
+            image_url = None
+            if hasattr(p, 'api_payload') and p.api_payload:
+                # Extrair Imagem
+                items = p.api_payload.get("items", [])
+                if items:
+                    images = items[0].get("images", [])
+                    if images:
+                        image_url = images[0].get("imageUrl")
+                
+                # Extrair Especificações (Ficha Técnica)
+                # Na VTEX, especificações costumam vir em campos como 'Porte', 'Idade', etc.
+                # ou dentro de uma lista de especificações se o mapeamento for genérico.
+                spec_map = {
+                    'Porte': 'breed_size',
+                    'Tipo da ração': 'product_type',
+                    'Peso da Ração': 'package_weight',
+                    'Idade': 'life_stage',
+                    'Corante': 'contains_coloring',
+                    'Raças de cachorro': 'target_breeds',
+                    'Indicação': 'indication',
+                    'Linha': 'product_line',
+                    'Transgênico': 'is_transgenic',
+                    'Marca': 'brand_spec',
+                    'Gênero': 'gender',
+                    'Seção': 'product_category'
+                }
+                
+                for vtex_key, internal_key in spec_map.items():
+                    val = p.api_payload.get(vtex_key)
+                    if isinstance(val, list) and val:
+                        specifications[internal_key] = val[0]
+                    elif val:
+                        specifications[internal_key] = val
+
             p_dict = {
                 'product_id': p.product_id,
                 'marketplace': p.marketplace,
                 'ean': p.ean or next((v.get('ean') for v in sku_variations if v.get('ean')), None),
                 'product_name': p.product_name,
-                'brand': p.brand,
+                'brand': specifications.get('brand_spec') or p.brand,
                 'url': p.url,
                 'category_id': p.category_id,
                 'sku_variations': sku_variations,
                 'price': next((v['price'] for v in sku_variations if v.get('price') is not None), None),
                 'available': any(v.get('available', False) for v in sku_variations),
+                'image_url': image_url,
+                **specifications
             }
             product_list.append(p_dict)
             
@@ -197,7 +235,7 @@ def run_extraction():
                     nut_type = nut_data['nutrient']
                     target_col = nutrient_mapping.get(nut_type)
                     if not target_col: continue
-                    if nut_data['unit'] == 'kcal/sache' and nut_type == 'metabolizable_energy': continue
+                    # v1.4.0: Removido bloqueio de kcal/sache para permitir normalização no Resolver
                     
                     val_real = nut_data['value']
                     alias = nut_data['matched_alias'].lower()

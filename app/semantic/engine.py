@@ -183,26 +183,30 @@ class SemanticEngine:
                 row,
             )
 
-            df.at[
-                index,
-                "product_category",
-            ] = self._enum_value(
-                semantic["product_category"],
-            )
+            # v1.4.0: Só aplica classificação semântica se o campo estiver vazio
+            if pd.isna(df.at[index, "product_category"]) or str(df.at[index, "product_category"]).strip() == "":
+                df.at[
+                    index,
+                    "product_category",
+                ] = self._enum_value(
+                    semantic["product_category"],
+                )
 
-            df.at[
-                index,
-                "life_stage",
-            ] = self._enum_value(
-                semantic["life_stage"],
-            )
+            if pd.isna(df.at[index, "life_stage"]) or str(df.at[index, "life_stage"]).strip() == "":
+                df.at[
+                    index,
+                    "life_stage",
+                ] = self._enum_value(
+                    semantic["life_stage"],
+                )
 
-            df.at[
-                index,
-                "breed_size",
-            ] = self._enum_value(
-                semantic["breed_size"],
-            )
+            if pd.isna(df.at[index, "breed_size"]) or str(df.at[index, "breed_size"]).strip() == "":
+                df.at[
+                    index,
+                    "breed_size",
+                ] = self._enum_value(
+                    semantic["breed_size"],
+                )
 
             df.at[
                 index,

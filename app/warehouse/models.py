@@ -29,9 +29,20 @@ class ProductDimension(WarehouseModel):
     breed_size: str | None
     protein_source: str | None
     clinical_category: str | None
-    has_guarantee_levels: bool
-    created_at: datetime
-    updated_at: datetime
+    # v1.4.0: Novos campos da Ficha Técnica
+    product_type: str | None = None
+    package_weight: str | None = None
+    contains_coloring: str | None = None
+    target_breeds: str | None = None
+    indication: str | None = None
+    product_line: str | None = None
+    is_transgenic: str | None = None
+    gender: str | None = None
+    image_url: str | None = None
+    
+    has_guarantee_levels: bool = False
+    created_at: datetime = datetime.now()
+    updated_at: datetime = datetime.now()
 
 
 @dataclass(slots=True)
