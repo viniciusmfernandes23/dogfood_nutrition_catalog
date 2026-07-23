@@ -76,7 +76,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     "calcium_min_mgkg": NormalizationRule(
         field="calcium_min_mgkg",
         target_min=100,
-        target_max=60000,
+        target_max=100000,
         overscale_factor=10,
         decimal_shift_factor=100,
         percent_factor=PERCENT_TO_MGKG_FACTOR,
@@ -87,7 +87,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     "calcium_max_mgkg": NormalizationRule(
         field="calcium_max_mgkg",
         target_min=100,
-        target_max=60000,
+        target_max=100000,
         overscale_factor=10,
         decimal_shift_factor=100,
         percent_factor=PERCENT_TO_MGKG_FACTOR,
@@ -98,7 +98,7 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     "phosphorus_mgkg": NormalizationRule(
         field="phosphorus_mgkg",
         target_min=100, 
-        target_max=40000,
+        target_max=80000,
         overscale_factor=10,
         decimal_shift_factor=100,
         percent_factor=PERCENT_TO_MGKG_FACTOR,

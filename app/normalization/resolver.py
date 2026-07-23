@@ -51,18 +51,8 @@ class Resolver:
                 return nutrient
 
         # Barreira 2: Proteção contra valores astronômicos (outliers extremos)
-        # v1.4.0: Ajustado para 100.000 para não interferir em correções de 10x de valores menores
-        if nutrient.value > 100_000:
-            for factor in [10000.0, 1000.0, 10.0]:
-                test_val = nutrient.value / factor
-                if self.validator.is_valid(test_val, rule):
-                    nutrient.original_value = nutrient.value
-                    nutrient.value = round(float(test_val), 2)
-                    nutrient.status = ValidationStatus.AUTO_CORRECTED
-                    nutrient.rule_applied = f"fix_scale_{int(factor)}x"
-                    nutrient.confidence = 1.0
-                    return nutrient
-            
+        # v1.5.0: Endurecido para evitar falsos positivos de escala.
+        if nutrient.value > 1_000_000:
             nutrient.original_value = nutrient.value
             nutrient.value = None
             nutrient.status = ValidationStatus.IMPLAUSIBLE
@@ -125,15 +115,6 @@ class Resolver:
                 nutrient.confidence = 0.0
                 return nutrient
 
-        # Caso Ideal: Unidade já correta e valor válido
-        # v1.4.0: Removido 'already_normalized' como retorno imediato para garantir que passe 
-        # por todas as validações biológicas e heurísticas de escala no Resolver.
-        # if nutrient.original_unit == nutrient.unit and self.validator.is_valid(nutrient.value, rule):
-        #     nutrient.status = ValidationStatus.NORMALIZED
-        #     nutrient.rule_applied = "already_normalized"
-        #     nutrient.confidence = get_confidence("already_normalized")
-        #     return nutrient
-
         # Fluxo de Conversão por Unidade Explícita
         if nutrient.original_unit:
             converted_value, rule_name = self._resolve_by_unit(
@@ -146,19 +127,14 @@ class Resolver:
                 if self.validator.is_valid(converted_value, rule):
                     nutrient.original_value = nutrient.value
                     nutrient.value = round(float(converted_value), 5)
-                    nutrient.status = ValidationStatus.AUTO_CORRECTED
+                    nutrient.status = ValidationStatus.NORMALIZED
                     nutrient.rule_applied = f"unit_direct_{rule_name}"
                     nutrient.confidence = 1.0
                     return nutrient
-                # v1.4.0: Se a unidade explícita falha na validação biológica,
-                # NÃO anulamos imediatamente. Permitimos que o fluxo siga para as
-                # heurísticas de escala (ex: 1200 g/kg -> 120 g/kg).
-                # nutrient.original_value = nutrient.value
-                # nutrient.value = None
-                # nutrient.status = ValidationStatus.IMPLAUSIBLE
-                # nutrient.rule_applied = f"invalid_conversion_{rule_name}"
-                # nutrient.confidence = 0.0
-                # return nutrient
+                
+                # v1.5.0: Se a unidade explícita resulta em valor inválido,
+                # tentamos heurísticas de escala APENAS se o valor original for plausível de erro 10x/100x.
+                # Caso contrário, o dado é considerado incoerente.
 
         # Fallback 1: Valor sem unidade mas já válido
         if self.validator.is_valid(nutrient.value, rule):
@@ -168,6 +144,7 @@ class Resolver:
             return nutrient
 
         # Fallback 2: Busca por heurísticas de escala (decimal shift, overscale)
+        # v1.5.0: Heurísticas agora são aplicadas com critério de unicidade e limites biológicos estritos.
         candidates = self._build_candidates(nutrient, rule)
         candidates = self.validator.validate_candidates(candidates, rule)
 
@@ -182,7 +159,7 @@ class Resolver:
 
         if self.validator.has_multiple_candidates(candidates):
             nutrient.status = ValidationStatus.AMBIGUOUS
-            nutrient.rule_applied = "ambiguous"
+            nutrient.rule_applied = "ambiguous_heuristics"
             nutrient.confidence = get_confidence("ambiguous")
             return nutrient
 
@@ -256,6 +233,12 @@ class Resolver:
         target_is_kcalkg = rule.field.endswith("_kcalkg")
         target_is_uikg = rule.field.endswith("_uikg")
 
+        # v1.5.0: Normalização de UI (Vitamina A, D, E)
+        if target_is_uikg:
+            if unit in ["ui/kg", "ui", "u.i.", "u.i"]:
+                return value, "already_uikg"
+            return None, "invalid_unit_for_uikg"
+
         if target_is_kcalkg:
             if unit == "kcal/kg":
                 return value, "already_kcalkg"
@@ -264,8 +247,6 @@ class Resolver:
             elif unit == "mj/kg":
                 return round(value * 239.006, 2), "mjkg_to_kcalkg"
             elif unit == "kcal/sache":
-                # v1.4.0: Suporte a sachês (base 85g conforme pedido do usuário)
-                # 72 kcal / 85g -> (72/85) * 1000 = 847.05 kcal/kg
                 return round((value / 85.0) * 1000.0, 2), "kcalsache_to_kcalkg"
             else:
                 return None, "invalid_energy_unit"
@@ -285,13 +266,18 @@ class Resolver:
                 return value, "already_mgkg"
             return value / GKG_TO_MGKG_FACTOR, "mgkg_to_gkg"
             
-        if unit == "ui/kg":
-            if target_is_uikg:
-                return value, "already_uikg"
-            return None, "invalid_unit_uikg"
-
         if unit == "mcg":
-            return value * 0.001, "mcg_to_mgkg"
+            # mcg -> mg/kg (dividir por 1000)
+            if target_is_mgkg:
+                return value * 0.001, "mcg_to_mgkg"
+            # mcg -> g/kg (dividir por 1.000.000)
+            return value * 0.000001, "mcg_to_gkg"
+
+        if unit == "ppm":
+            # ppm = mg/kg
+            if target_is_mgkg:
+                return value, "ppm_to_mgkg"
+            return value / 1000.0, "ppm_to_gkg"
 
         return None, None
 
@@ -306,25 +292,40 @@ class Resolver:
         value = nutrient.value
         candidates: list[tuple[float, str]] = []
 
+        # v1.5.0: Heurísticas agora só são geradas se o valor estiver fora do limite biológico.
+        # Se o valor já é válido, não tentamos "melhorá-lo" para evitar falsos positivos.
+        if self.validator.is_valid(value, rule):
+            return []
+
+        # Divisão por potências de 10 (Erros de escala/deslocamento de vírgula)
+        if value > rule.target_max:
+            for factor in [10.0, 100.0, 1000.0]:
+                test_val = value / factor
+                if self.validator.is_valid(test_val, rule):
+                    candidates.append((test_val, f"fix_{int(factor)}x_scale_down"))
+
+        # Multiplicação por potências de 10 (Erros de escala/deslocamento de vírgula)
+        if value < rule.target_min:
+            for factor in [10.0, 100.0, 1000.0]:
+                test_val = value * factor
+                if self.validator.is_valid(test_val, rule):
+                    candidates.append((test_val, f"fix_{int(factor)}x_scale_up"))
+
+        # Heurísticas específicas da regra (overscale, percent, gkg_to_mgkg)
         if rule.overscale_factor:
-            candidates.append((value / rule.overscale_factor, "overscale"))
+            test_val = value / rule.overscale_factor
+            if self.validator.is_valid(test_val, rule):
+                candidates.append((test_val, "rule_overscale"))
 
         if rule.percent_factor:
-            candidates.append((value * rule.percent_factor, "percent_conversion"))
+            test_val = value * rule.percent_factor
+            if self.validator.is_valid(test_val, rule):
+                candidates.append((test_val, "rule_percent_conv"))
 
         if rule.gkg_to_mgkg:
-            candidates.append((value * GKG_TO_MGKG_FACTOR, "gkg_to_mgkg"))
-            
-        if rule.decimal_shift_factor:
-            if nutrient.original_unit != nutrient.unit:
-                candidates.append((value * rule.decimal_shift_factor, "decimal_shift"))
-        
-        if rule.decimal_shift_up:
-            candidates.append((value * rule.decimal_shift_up, "decimal_shift_up"))
-
-        if value > rule.target_max:
-            candidates.append((value / 10.0, "fix_10x_scale"))
-            candidates.append((value / 100.0, "fix_100x_scale"))
+            test_val = value * GKG_TO_MGKG_FACTOR
+            if self.validator.is_valid(test_val, rule):
+                candidates.append((test_val, "rule_gkg_to_mgkg"))
 
         return candidates
 

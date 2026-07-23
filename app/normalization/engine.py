@@ -167,25 +167,36 @@ class NormalizationEngine:
                 min_sum = 850.0
                 max_sum = 1050.0
                 
-                if macro_sum < min_sum or macro_sum > max_sum:
-                    print(f"[BIOLOGICAL AUDIT] Falha no balanço de massa ({macro_sum}g/kg) no produto {product_id}.")
+                # v1.5.0: BALANÇO EM TRÊS NÍVEIS
+                # OK: 850–1050 g/kg
+                # REVIEW: 700–850 ou 1050–1150 g/kg
+                # FAILED: < 700 ou > 1150 g/kg
+                
+                status = ValidationStatus.NORMALIZED
+                reason = None
+                
+                if 850 <= macro_sum <= 1050:
+                    status = ValidationStatus.NORMALIZED
+                elif (700 <= macro_sum < 850) or (1050 < macro_sum <= 1150):
+                    status = ValidationStatus.REVIEW
+                    reason = f"Mass balance audit required: {macro_sum}g/kg (Borderline)"
+                else:
+                    status = ValidationStatus.PRODUCT_MASS_BALANCE_FAILED
+                    reason = f"Mass balance failed: {macro_sum}g/kg (Implausible)"
+
+                if status != ValidationStatus.NORMALIZED:
+                    print(f"[BIOLOGICAL AUDIT] {status} no balanço de massa ({macro_sum}g/kg) no produto {product_id}.")
                     for m in macros_all:
-                        # Em vez de anular imediatamente (np.nan), marcamos para auditoria
-                        # se estiver próximo ou se for erro de escala. 
-                        # Se for > 1050, é erro crítico.
-                        df.at[index, f"{m}_status"] = ValidationStatus.REVIEW if macro_sum < max_sum else ValidationStatus.PRODUCT_MASS_BALANCE_FAILED
-                        df.at[index, f"{m}_reason"] = f"Mass balance audit required: {macro_sum}g/kg (Expected {min_sum}-{max_sum})"
-                        if macro_sum > max_sum:
+                        df.at[index, f"{m}_status"] = status
+                        df.at[index, f"{m}_reason"] = reason
+                        if status == ValidationStatus.PRODUCT_MASS_BALANCE_FAILED:
                             df.at[index, m] = np.nan
                     
-                    # Anula energia em caso de falha grave no balanço de massa (> 1050)
-                    if macro_sum > max_sum:
+                    # Impacto na Energia
+                    df.at[index, "metabolizable_energy_kcalkg_status"] = status
+                    df.at[index, "metabolizable_energy_kcalkg_reason"] = reason
+                    if status == ValidationStatus.PRODUCT_MASS_BALANCE_FAILED:
                         df.at[index, "metabolizable_energy_kcalkg"] = None
-                        df.at[index, "metabolizable_energy_kcalkg_status"] = ValidationStatus.PRODUCT_MASS_BALANCE_FAILED
-                        df.at[index, "metabolizable_energy_kcalkg_reason"] = f"Mass balance failed: {macro_sum}g/kg"
-                    else:
-                        df.at[index, "metabolizable_energy_kcalkg_status"] = ValidationStatus.REVIEW
-                        df.at[index, "metabolizable_energy_kcalkg_reason"] = f"Mass balance audit required: {macro_sum}g/kg"
                     return 
 
         # 3. Razão Cálcio:Fósforo

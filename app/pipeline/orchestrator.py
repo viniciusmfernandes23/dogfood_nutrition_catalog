@@ -9,6 +9,7 @@ from app.pipeline.models import (
     PipelineResult,
 )
 from app.pipeline.report import PipelineReport
+from app.pipeline.audit_report import AuditReporter
 from app.semantic.engine import SemanticEngine
 from app.warehouse.pipeline import WarehousePipeline
 
@@ -36,6 +37,10 @@ class PipelineOrchestrator:
         )
 
         self.report = PipelineReport(
+            output_dir=self.config.output_directory,
+        )
+
+        self.audit_reporter = AuditReporter(
             output_dir=self.config.output_directory,
         )
 
@@ -107,6 +112,10 @@ class PipelineOrchestrator:
             # ----------------------------------------------
 
             tables, exported = self.warehouse_pipeline.run(semantic_df)
+            
+            # v1.5.0: Geração do relatório de auditoria detalhado
+            if "fact_nutrient" in tables:
+                self.audit_reporter.generate_report(semantic_df, tables["fact_nutrient"])
 
             result.exported_files = exported
 
