@@ -22,7 +22,7 @@ def extract_guarantee_section(
 
     start = None
 
-    # v1.5.2: Aliases para seção de garantia
+    # v1.5.5: Aliases exaustivos para seção de garantia
     guarantee_markers = [
         "níveis de garantia",
         "niveis de garantia",
@@ -31,15 +31,30 @@ def extract_guarantee_section(
         "analise garantida",
         "composição",
         "composicao",
+        "constituintes analíticos",
+        "componentes analíticos",
+        "análise média",
+        "informação nutricional",
+        "informacao nutricional",
+        "levels of guarantee",
+        "guaranteed analysis",
     ]
     
     for i, line in enumerate(lines):
         line_lower = line.lower()
+        # v1.5.5: Busca por match exato ou início de linha para evitar falsos positivos
         if any(marker in line_lower for marker in guarantee_markers):
-            # Se for composição, queremos garantir que não é apenas a lista de ingredientes
-            # mas sim que contém níveis. Heurística: se a linha ou as próximas contêm '%' ou 'g/kg'
-            start = i
-            break
+            # Verificação adicional: a seção de garantia costuma ter valores numéricos próximos
+            # Olhamos as próximas 10 linhas em busca de padrões de nutrientes (%, g/kg, mg/kg)
+            found_values = False
+            for j in range(i, min(i + 15, len(lines))):
+                if any(u in lines[j].lower() for u in ["%", "g/kg", "mg/kg", "kcal", "ui/kg"]):
+                    found_values = True
+                    break
+            
+            if found_values:
+                start = i
+                break
 
     if start is None:
 

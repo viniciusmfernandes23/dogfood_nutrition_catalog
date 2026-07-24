@@ -161,7 +161,7 @@ def run_extraction():
                 # Extrair Especificações (Ficha Técnica)
                 # Na VTEX, especificações costumam vir em campos como 'Porte', 'Idade', etc.
                 # ou dentro de uma lista de especificações se o mapeamento for genérico.
-                # v1.5.2: Mapeamento exaustivo da VTEX
+                # v1.5.5: Mapeamento exaustivo e dinâmico da VTEX
                 spec_map = {
                     'Porte': 'breed_size',
                     'Tipo da ração': 'product_type',
@@ -173,28 +173,40 @@ def run_extraction():
                     'Linha': 'product_line',
                     'Transgênico': 'is_transgenic',
                     'Marca': 'brand_spec',
-                    'Seção': 'product_category'
+                    'Seção': 'product_category',
+                    'Departamento': 'product_dept',
+                    'Categoria': 'product_cat_vtex'
                 }
                 
-                # A API VTEX pode retornar especificações em campos de primeiro nível
-                # ou dentro de uma lista de propriedades.
                 all_props = {}
                 # 1. Tentar campos de primeiro nível
                 for k, v in p.api_payload.items():
                     if isinstance(v, list) and v:
                         all_props[k] = v[0]
-                    elif isinstance(v, str):
-                        all_props[k] = v
+                    elif isinstance(v, (str, int, float)):
+                        all_props[k] = str(v)
                 
-                # 2. Tentar lista de especificações (se existir)
-                for item in p.api_payload.get("allSpecifications", []):
-                    val = p.api_payload.get(item)
+                # 2. Tentar allSpecifications (lista de nomes de campos)
+                # Na VTEX, 'allSpecifications' lista as chaves, e os valores estão no payload principal
+                for spec_key in p.api_payload.get("allSpecifications", []):
+                    val = p.api_payload.get(spec_key)
                     if isinstance(val, list) and val:
-                        all_props[item] = val[0]
+                        all_props[spec_key] = val[0]
                 
+                # 3. Tentar percorrer 'items' para especificações de SKU (como Peso)
+                for item in p.api_payload.get("items", []):
+                    for spec in item.get("variations", []):
+                        val = item.get(spec)
+                        if isinstance(val, list) and val:
+                            all_props[spec] = val[0]
+
                 for vtex_key, internal_key in spec_map.items():
                     if vtex_key in all_props:
                         specifications[internal_key] = all_props[vtex_key]
+                
+                # Fallback para product_category usando Departamento/Categoria se Seção falhar
+                if not specifications.get('product_category'):
+                    specifications['product_category'] = specifications.get('product_dept') or specifications.get('product_cat_vtex')
 
             # v1.5.1: Proteção contra product_id vazio
             if not p.product_id:

@@ -195,8 +195,14 @@ class SemanticEngine:
 
             # 2. Life Stage
             # Prioridade: Ficha Técnica (life_stage) -> Inferência Semântica (Nome/Indicação)
-            if pd.isna(df.at[index, "life_stage"]) or str(df.at[index, "life_stage"]).strip() == "":
-                df.at[index, "life_stage"] = self._enum_value(semantic["life_stage"])
+            # v1.5.5: Reforçamos o fallback semântico garantindo que ele use o texto completo (nome + indicação)
+            if pd.isna(df.at[index, "life_stage"]) or str(df.at[index, "life_stage"]).strip() == "" or str(df.at[index, "life_stage"]).lower() == "nan":
+                # Tenta match no nome do produto primeiro (mais assertivo para idade)
+                name_match = self.life_stage_classifier.best_match(str(row.get("product_name", "")))
+                if name_match:
+                    df.at[index, "life_stage"] = name_match.value
+                else:
+                    df.at[index, "life_stage"] = self._enum_value(semantic["life_stage"])
 
             # 3. Breed Size
             if pd.isna(df.at[index, "breed_size"]) or str(df.at[index, "breed_size"]).strip() == "":
