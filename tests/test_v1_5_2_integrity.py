@@ -8,7 +8,8 @@ def test_tier_and_lifestage_logic():
     
     # Caso 1: Super Premium na Ficha Técnica (product_type)
     # Caso 2: Life Stage 'Filhote' no nome
-    # Caso 3: ID Vazio (deve ser ignorado)
+    # Caso 3: Premium Especial na Ficha Técnica (product_line)
+    # Caso 4: ID Vazio (deve ser ignorado)
     
     data = [
         {
@@ -22,6 +23,13 @@ def test_tier_and_lifestage_logic():
             "product_name": "Ração Úmida Pet Delícia Cães Filhotes Papinha",
             "product_type": "Premium",
             "life_stage": ""
+        },
+        {
+            "product_id": 3,
+            "product_name": "Ração Intermediária",
+            "product_type": "Ração Seca",
+            "product_line": "Premium Especial",
+            "life_stage": None
         },
         {
             "product_id": "", # ID Vazio
@@ -43,12 +51,15 @@ def test_tier_and_lifestage_logic():
     assert enriched_df.loc[1, "life_stage"] == "Filhote"
     assert enriched_df.loc[1, "product_tier"] == "Premium"
     
+    # Prod 3 deve ser Premium Especial (via product_line)
+    assert enriched_df.loc[2, "product_tier"] == "Premium Especial"
+    
     # 2. Testar Builder (Sanitização de IDs)
     builder = ProductDimensionBuilder()
     dim_df = builder.build(enriched_df)
     
     # O produto com ID vazio deve ter sido removido
-    assert len(dim_df) == 2
+    assert len(dim_df) == 3
     assert "" not in dim_df["product_id"].values
     assert "gender" not in dim_df.columns
 

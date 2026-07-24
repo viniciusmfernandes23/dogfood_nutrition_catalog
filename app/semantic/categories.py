@@ -110,6 +110,8 @@ class ProductTier(str, Enum):
     STANDARD = "Standard"
 
     PREMIUM = "Premium"
+    
+    PREMIUM_SPECIAL = "Premium Especial"
 
     SUPER_PREMIUM = "Super Premium"
 

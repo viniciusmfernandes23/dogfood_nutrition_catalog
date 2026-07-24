@@ -203,20 +203,43 @@ class SemanticEngine:
                 df.at[index, "breed_size"] = self._enum_value(semantic["breed_size"])
 
             # 4. Product Tier
-            # v1.5.2: Prioriza 'Super Premium' se detectado no product_type ou product_line da ficha técnica
+            # v1.5.3: Lógica dinâmica baseada na Ficha Técnica (Tipo da Ração / Linha)
             tier_override = None
-            ptype = str(row.get("product_type", "")).lower()
-            pline = str(row.get("product_line", "")).lower()
-            if "super premium" in ptype or "super premium" in pline:
-                tier_override = ProductTier.SUPER_PREMIUM.value
-            elif "premium especial" in ptype or "premium especial" in pline:
-                tier_override = ProductTier.PREMIUM_SPECIAL.value
-            elif "premium" in ptype or "premium" in pline:
-                tier_override = ProductTier.PREMIUM.value
+            # Consideramos tanto product_type (Tipo da Ração) quanto product_line (Linha)
+            # como fontes da verdade da ficha técnica.
+            ft_sources = [
+                str(row.get("product_type", "")).lower(),
+                str(row.get("product_line", "")).lower()
+            ]
+            
+            # Mapeamento dinâmico de termos da ficha técnica para categorias canônicas
+            tier_map = {
+                "super premium": ProductTier.SUPER_PREMIUM.value,
+                "premium especial": ProductTier.PREMIUM_SPECIAL.value,
+                "premium": ProductTier.PREMIUM.value,
+                "standard": ProductTier.STANDARD.value,
+                "econômica": ProductTier.STANDARD.value,
+                "economica": ProductTier.STANDARD.value,
+                "manutenção": ProductTier.STANDARD.value,
+                "manutencao": ProductTier.STANDARD.value,
+                "high premium": ProductTier.PREMIUM_SPECIAL.value,
+            }
+            
+            for source_text in ft_sources:
+                if not source_text or source_text == "nan":
+                    continue
+                # Busca o melhor match no mapeamento dinâmico
+                for term, canonical in tier_map.items():
+                    if term in source_text:
+                        tier_override = canonical
+                        break
+                if tier_override:
+                    break
             
             if tier_override:
                 df.at[index, "product_tier"] = tier_override
             else:
+                # Fallback para inferência semântica baseada no contexto geral (nome, descrição, etc)
                 df.at[index, "product_tier"] = self._enum_value(
                     semantic["product_tier"],
                     ProductTier.STANDARD.value,
