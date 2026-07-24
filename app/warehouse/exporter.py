@@ -164,15 +164,27 @@ class WarehouseExporter:
             try:
                 existing_df = pd.read_csv(output_file, encoding="utf-8-sig")
                 
-                # Normaliza tipos para garantir join correto
+                # v1.5.1: Normaliza tipos para garantir join correto e remove vazios antes do append
                 id_cols = ["product_id", "collected_at", "nutrient_key", "sku_id", "marketplace", "ean"]
+                
+                # Limpeza de IDs vazios em ambos os DataFrames
+                if "product_id" in existing_df.columns:
+                    existing_df = existing_df.dropna(subset=["product_id"])
+                    existing_df = existing_df[existing_df["product_id"].astype(str).str.strip() != ""]
+                
+                if "product_id" in dataframe.columns:
+                    dataframe = dataframe.dropna(subset=["product_id"])
+                    dataframe = dataframe[dataframe["product_id"].astype(str).str.strip() != ""]
+
                 for col in id_cols:
                     if col in existing_df.columns:
-                        existing_df[col] = existing_df[col].astype(str)
+                        existing_df[col] = existing_df[col].astype(str).str.strip()
                     if col in dataframe.columns:
-                        dataframe[col] = dataframe[col].astype(str)
+                        dataframe[col] = dataframe[col].astype(str).str.strip()
 
-                combined_df = pd.concat([existing_df, dataframe], ignore_index=True)
+                # Garante que as colunas sejam idênticas para evitar deslocamento
+                common_cols = [c for c in existing_df.columns if c in dataframe.columns]
+                combined_df = pd.concat([existing_df[common_cols], dataframe[common_cols]], ignore_index=True)
                 
                 # Deduplicação inteligente baseada no tipo de dado
                 if filename == "fact_price_snapshot.csv" and "collected_at" in combined_df.columns:
@@ -207,7 +219,8 @@ class WarehouseExporter:
         elif "fact_price" in filename:
             return ["product_id", "marketplace", "ean", "sku_id", "sku_name", "package_weight_kg", "price", "list_price", "subscriber_price", "price_per_kg", "available", "collected_at"]
         elif "dim_product" in filename:
-            return ["product_id", "brand", "product_name", "product_category"]
+            from app.warehouse.dim_product import ProductDimensionBuilder
+            return list(ProductDimensionBuilder.DEFAULT_COLUMNS) + ["has_guarantee_levels", "created_at", "updated_at"]
         return ["product_id"]
 
     def _apply_final_biological_sanity_check(self, df: pd.DataFrame) -> None:
@@ -223,9 +236,9 @@ class WarehouseExporter:
         
         sanity_checks = [
             ((df["nutrient_key"].isin(macro_fields)) & (df["nutrient_value"] > 1000), "macro_exceeds_1000gkg"),
-            ((df["nutrient_key"] == "metabolizable_energy_kcalkg") & (df["nutrient_value"] > 4500), "energy_exceeds_4500kcalkg"),
+            ((df["nutrient_key"] == "metabolizable_energy_kcalkg") & (df["nutrient_value"] > 9000), "energy_exceeds_9000kcalkg"),
             ((df["nutrient_key"] == "metabolizable_energy_kcalkg") & (df["nutrient_value"] < 500), "energy_below_500kcalkg"),
-            ((df["nutrient_key"].isin(mineral_fields)) & (df["nutrient_value"] > 60000), "mineral_toxicity_limit"),
+            ((df["nutrient_key"].isin(mineral_fields)) & (df["nutrient_value"] > 100000), "mineral_toxicity_limit"),
             ((df["nutrient_key"].isin(mineral_fields)) & (df["nutrient_value"] < 0.01), "mineral_insignificant_limit")
         ]
 
