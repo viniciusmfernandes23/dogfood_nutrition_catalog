@@ -7,15 +7,42 @@ Este projeto é um pipeline automatizado de Engenharia de Dados focado na extra�
 O pipeline opera em um ciclo de vida refinado, garantindo que o dado bruto seja transformado em informação de negócio confiável:
 
 ```mermaid
-graph TD
-    A[Marketplaces - API/Web] -->|Dados Brutos| B(Ingestão Raw)
-    B --> C{Motor de Normalização}
-    C -->|Conversão de Escala & Unidade| D[Auditoria Biológica Cruzada]
-    D -->|Validação Ca:P / Balanço de Massa| E{Barreira de Sanidade Final}
-    E -->|Anulação de Impossíveis| F[Camada Semântica]
-    F -->|Nomes Amigáveis para BI| G[(Data Warehouse CSV)]
-    G --> H[Power BI / Analytics]
-    E -->|Log de Erros| I[sanity_audit_logs.csv]
+flowchart TD
+    subgraph Ingestion["1. Camada de Ingestão (Collectors)"]
+        A1[API VTEX - Cobasi] -->|JSON Payload| B1[API Collector]
+        A2[Web Scraping] -->|HTML/Text| B2[Cobasi Crawler]
+    end
+
+    subgraph Processing["2. Motor de Processamento (Core)"]
+        B1 & B2 --> C1{Nutrition Parser}
+        C1 -->|Regex & Aliases| D1[Normalization Resolver]
+        D1 -->|Escala 10x/100x & Unidades| E1[Biological Engine]
+        E1 -->|Balanço de Massa 600-1050| F1[Semantic Engine]
+        F1 -->|Tier, Age & Category| G1[Data Integrity Guard]
+    end
+
+    subgraph Storage["3. Camada de Armazenamento (Warehouse)"]
+        G1 -->|Star Schema| H1[(dim_product.csv)]
+        G1 -->|Nutrientes Long| H2[(fact_nutrient.csv)]
+        G1 -->|Preços Snapshot| H3[(fact_price_snapshot.csv)]
+        G1 -->|Audit Trail| H4[(sanity_audit_logs.csv)]
+    end
+
+    subgraph BI["4. Camada de Visualização"]
+        H1 & H2 & H3 --> I1[Power BI Dashboard]
+        H4 --> I2[Auditoria & Qualidade]
+    end
+
+    %% Estilização
+    classDef ingestion fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef processing fill:#bbf,stroke:#333,stroke-width:2px;
+    classDef storage fill:#dfd,stroke:#333,stroke-width:2px;
+    classDef bi fill:#fdd,stroke:#333,stroke-width:2px;
+
+    class A1,A2,B1,B2 ingestion;
+    class C1,D1,E1,F1,G1 processing;
+    class H1,H2,H3,H4 storage;
+    class I1,I2 bi;
 ```
 
 ## 🌟 Funcionalidades Principais
@@ -26,12 +53,12 @@ graph TD
     - Corrige erros sistemáticos de escala (10x, 100x) através de heurísticas de plausibilidade.
     - Mantém rastreabilidade completa (`original_value` vs `normalized_value`).
 - **Auditoria Biológica de Precisão:**
-    - **Balanço de Massa:** Verifica se a soma de macronutrientes (Proteína, Gordura, Fibra, Cinzas e Umidade) está na faixa biológica (**600-1050 g/kg**), considerando a presença de Carboidratos (NFE) em rações secas.
+    - **Balanço de Massa (v1.5.6):** Verifica se a soma de macronutrientes (Proteína, Gordura, Fibra, Cinzas e Umidade) está na faixa biológica (**600-1050 g/kg**), acomodando Carboidratos (NFE) não declarados.
     - **Razão Ca:P:** Valida a relação essencial entre Cálcio e Fósforo (1:1 a 2:1).
     - **Contexto de Categoria:** Flexibiliza automaticamente limites para Petiscos e Suplementos (até 3x o teto padrão).
-    - **Energia Metabolizável:** Validação determinística baseada em unidades e faixas físicas (500-4500 kcal/kg).
+    - **Energia Metabolizável:** Validação determinística com correção automática de escala (10x, 100x) e suporte a múltiplas unidades (kcal/kg, MJ/kg, kcal/sachê).
 - **Data Warehouse Star Schema:**
-    - **`dim_product`**: Cadastro limpo de produtos com atributos de Porte, Idade, Tier e Proteína.
+    - **`dim_product`**: Cadastro limpo de produtos com atributos de Porte, Idade, Tier, Linha e Imagem (Tooltip Ready).
     - **`fact_nutrient`**: Perfil nutricional detalhado no formato LONG para análises granulares.
     - **`fact_price_snapshot`**: Histórico temporal de preços por SKU/Embalagem.
 - **Power BI Ready:** Dados exportados com Camada Semântica (nomes amigáveis) e codificação UTF-8-SIG para compatibilidade imediata.
