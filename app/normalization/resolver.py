@@ -91,6 +91,18 @@ class Resolver:
                 return nutrient
 
             if converted_value is not None:
+                # v1.5.1: Tratamento de erro de escala 10x na energia (ex: 13780 -> 1378)
+                if converted_value > 9000:
+                    for factor in [10.0, 100.0]:
+                        test_val = converted_value / factor
+                        if 500 <= test_val <= 9000:
+                            nutrient.original_value = nutrient.value
+                            nutrient.value = round(float(test_val), 2)
+                            nutrient.status = ValidationStatus.AUTO_CORRECTED
+                            nutrient.rule_applied = f"fix_energy_scale_{int(factor)}x"
+                            nutrient.confidence = 0.9
+                            return nutrient
+
                 if 500 <= converted_value <= 9000:
                     nutrient.original_value = nutrient.value
                     nutrient.value = round(float(converted_value), 5)

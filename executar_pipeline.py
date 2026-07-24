@@ -183,6 +183,11 @@ def run_extraction():
                     elif val:
                         specifications[internal_key] = val
 
+            # v1.5.1: Proteção contra product_id vazio
+            if not p.product_id:
+                print(f"  AVISO: Ignorando produto sem ID: {p.product_name}")
+                continue
+
             p_dict = {
                 'product_id': p.product_id,
                 'marketplace': p.marketplace,

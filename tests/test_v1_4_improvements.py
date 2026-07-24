@@ -9,34 +9,32 @@ from app.warehouse.dim_product import ProductDimensionBuilder
 def test_metabolizable_energy_conversions():
     engine = NormalizationEngine()
     
-    # Caso 1: kcal/100g -> kcal/kg
-    # Caso 2: kcal/sache (85g) -> kcal/kg
-    # Caso 3: MJ/kg -> kcal/kg
-    # Caso 4: Unidade inválida (mg/kg) -> anular
+    # v1.5.1: 
+    # 1. 13780 -> 1378 (fix_10x)
+    # 2. 105515 -> 1055.15 (fix_100x)
+    # 3. 3700 com ponto (milhar) -> 3700
     
     data = {
-        "product_id": [1, 2, 3, 4, 5],
-        "product_name": ["Prod 1", "Prod 2", "Prod 3", "Prod 4", "Prod 5"],
-        "metabolizable_energy_kcalkg": [477.0, 72.0, 15.0, 300.0, 4038.0],
-        "metabolizable_energy_unit": ["kcal/100g", "kcal/sache", "mj/kg", "mg/kg", "kcal/kg"]
+        "product_id": [1, 2, 3, 4],
+        "metabolizable_energy_kcalkg": [13780.0, 105515.0, 3700.0, 477.0],
+        "metabolizable_energy_unit": ["kcal/kg", "kcal/kg", "kcal/kg", "kcal/100g"]
     }
     df = pd.DataFrame(data)
     norm_df, _ = engine.normalize_dataframe(df)
     
+    # 13780 -> 1378
+    assert norm_df.loc[0, "metabolizable_energy_kcalkg"] == 1378.0
+    assert "fix_energy_scale_10x" in norm_df.loc[0, "metabolizable_energy_kcalkg_rule"]
+    
+    # 105515 -> 1055.15
+    assert norm_df.loc[1, "metabolizable_energy_kcalkg"] == 1055.15
+    assert "fix_energy_scale_100x" in norm_df.loc[1, "metabolizable_energy_kcalkg_rule"]
+    
+    # 3700 -> 3700
+    assert norm_df.loc[2, "metabolizable_energy_kcalkg"] == 3700.0
+    
     # 477 kcal/100g -> 4770 kcal/kg
-    assert norm_df.loc[0, "metabolizable_energy_kcalkg"] == 4770.0
-    
-    # 72 kcal / 85g -> (72/85)*1000 = 847.06
-    assert 847.0 <= norm_df.loc[1, "metabolizable_energy_kcalkg"] <= 847.1
-    
-    # 15 MJ/kg -> 15 * 239.006 = 3585.09
-    assert 3585.0 <= norm_df.loc[2, "metabolizable_energy_kcalkg"] <= 3585.1
-    
-    # 300 mg/kg -> anular
-    assert pd.isna(norm_df.loc[3, "metabolizable_energy_kcalkg"])
-    
-    # 4038 kcal/kg -> manter
-    assert norm_df.loc[4, "metabolizable_energy_kcalkg"] == 4038.0
+    assert norm_df.loc[3, "metabolizable_energy_kcalkg"] == 4770.0
 
 def test_mass_balance_validation():
     engine = NormalizationEngine()

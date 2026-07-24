@@ -11,94 +11,39 @@ from app.parsers.regex_patterns import (
     UNIT,
 )
 
-
-def parse_value(
-    text: str,
-    aliases: list[str],
-) -> tuple[float | None, str | None, str | None]:
+def clean_numeric_value(raw_val: str) -> float | None:
     """
-    Procura o primeiro valor correspondente aos aliases informados.
+    Limpa strings numéricas tratando separadores de milhar e decimais.
+    Ex: '3.700' -> 3700.0, '1.055,15' -> 1055.15
     """
-
-    for alias in aliases:
-        # v1.3.15: Proteção contra matches parciais (ex: 'p' dando match em 'potássio')
-        # Usamos \b apenas se o alias for curto e alfanumérico para evitar falsos positivos.
-        # Se for um alias longo ou com regex (ex: \(mín\)), confiamos na especificidade do alias.
-        boundary = r"\b" if (len(alias) <= 2 and re.match(r"^\w+$", alias)) else ""
-        pattern_str = alias if "\\" in alias else re.escape(alias)
+    try:
+        # Se tem vírgula e ponto, a vírgula é decimal (padrão BR)
+        if "." in raw_val and "," in raw_val:
+            return float(raw_val.replace(".", "").replace(",", "."))
         
-        pattern = re.compile(
-            rf"{boundary}{pattern_str}{boundary}"
-            rf"{SEPARATOR}"
-            rf"{NUMBER}"
-            rf"\s*"
-            rf"{UNIT}",
-            FLAGS,
-        )
-
-        match = pattern.search(text)
-
-        if not match:
-            continue
-
-        try:
-            raw_val = match.group(1)
-            if "." in raw_val and "," in raw_val:
-                clean_val = raw_val.replace(".", "").replace(",", ".")
-            elif "," in raw_val:
-                clean_val = raw_val.replace(",", ".")
-            elif "." in raw_val:
-                parts = raw_val.split(".")
-                if len(parts) == 2 and len(parts[1]) == 3:
-                    clean_val = raw_val.replace(".", "")
-                else:
-                    clean_val = raw_val
-            else:
-                clean_val = raw_val
-                
-            value = float(clean_val)
-            unit = match.group(2).strip().lower() if match.group(2) else None
+        # Se tem apenas vírgula, é decimal
+        if "," in raw_val:
+            return float(raw_val.replace(",", "."))
+        
+        # Se tem apenas ponto, pode ser milhar (3.700) ou decimal (3.7)
+        if "." in raw_val:
+            parts = raw_val.split(".")
+            # Heurística: se a última parte tem 3 dígitos, é milhar (ex: 3.700, 10.530)
+            # A menos que seja um valor muito pequeno (ex: 1.234 pode ser milhar ou decimal, 
+            # mas em ração 1.234 kcal é improvável ser decimal se não tiver vírgula).
+            if len(parts[-1]) == 3:
+                return float(raw_val.replace(".", ""))
+            return float(raw_val)
             
-            if unit in ["%", "por cento", "porcentagem"]:
-                unit = "%"
-            elif unit in ["g/kg", "g / kg", "g.kg"]:
-                unit = "g/kg"
-            elif unit in ["mg/kg", "mg / kg", "mg.kg"]:
-                unit = "mg/kg"
-            elif unit in ["ui/kg", "ui / kg", "ui.kg", "ui", "u.i.", "u.i"]:
-                unit = "ui/kg"
-            elif unit in ["mcg", "ug"]:
-                unit = "mcg"
-            elif unit and ("kcal" in unit and "100" in unit):
-                unit = "kcal/100g"
-            elif unit in ["kcal/kg", "kcal / kg", "kcal.kg", "kcal", "cal/kg", "cal"]:
-                unit = "kcal/kg"
-            elif unit in ["kcal/sachê", "kcal/sache"]:
-                unit = "kcal/sache"
-            elif unit and ("mj" in unit and "kg" in unit):
-                unit = "mj/kg"
-
-            return (
-                value,
-                unit,
-                alias,
-            )
-        except (ValueError, IndexError):
-            continue
-
-    return (
-        None,
-        None,
-        None,
-    )
-
+        return float(raw_val)
+    except (ValueError, IndexError):
+        return None
 
 def parse_nutrition(
     raw_text: Any,
 ) -> dict[str, dict[str, Any]]:
     """
-    Extrai todos os nutrientes encontrados na seção
-    'Níveis de Garantia'.
+    Extrai todos os nutrientes encontrados na seção 'Níveis de Garantia'.
     """
 
     if not isinstance(raw_text, str) or not raw_text.strip():
@@ -106,26 +51,21 @@ def parse_nutrition(
 
     text = raw_text.lower()
     parsed: dict[str, dict[str, Any]] = {}
-    
     all_matches = []
 
     for nutrient, aliases in NUTRIENT_ALIASES.items():
         for alias in aliases:
-            # v1.3.15: Proteção contra matches parciais (ex: 'p' dando match em 'potássio')
             boundary = r"\b" if (len(alias) <= 2 and re.match(r"^\w+$", alias)) else ""
             
-            # v1.3.13: Se o alias já contém escape de regex (como \(mín\)), usamos como está.
-            # Caso contrário, escapamos caracteres especiais, mas permitimos '.' literal para abreviações.
             if "\\" in alias or "(" in alias or ")" in alias:
                 pattern_str = alias
             elif "." in alias:
-                # Escapa tudo exceto o ponto
                 pattern_str = re.escape(alias).replace(r"\.", r"\.?")
             else:
                 pattern_str = re.escape(alias)
                 
-            # Regex de número que aceita separadores de milhar (10.530,00)
-            NUMBER_EXT = r"(\d+(?:[.,]\d+)*(?:[.,]\d+)?)"
+            # Regex de número que aceita separadores de milhar e decimais
+            NUMBER_EXT = r"(\d+(?:[.,]\d+)*)"
             pattern = re.compile(
                 rf"{boundary}{pattern_str}{boundary}"
                 rf"[:\s]*" 
@@ -137,64 +77,48 @@ def parse_nutrition(
             )
             
             for match in pattern.finditer(text):
-                try:
-                    raw_val = match.group(1)
-                    if "." in raw_val and "," in raw_val:
-                        clean_val = raw_val.replace(".", "").replace(",", ".")
-                    elif "," in raw_val:
-                        clean_val = raw_val.replace(",", ".")
-                    elif "." in raw_val:
-                        parts = raw_val.split(".")
-                        if len(parts) == 2 and len(parts[1]) == 3:
-                            clean_val = raw_val.replace(".", "")
-                        else:
-                            clean_val = raw_val
-                    else:
-                        clean_val = raw_val
-                        
-                    value = float(clean_val)
-                    unit = match.group(2).strip().lower() if match.group(2) else None
-                    
-                    if unit in ["%", "por cento", "porcentagem"]:
-                        unit = "%"
-                    elif unit in ["g/kg", "g / kg", "g.kg", "g"]:
-                        unit = "g/kg"
-                    elif unit in ["mg/kg", "mg / kg", "mg.kg", "mg"]:
-                        unit = "mg/kg"
-                    elif unit in ["ui/kg", "ui / kg", "ui.kg", "ui", "u.i.", "u.i"]:
-                        unit = "ui/kg"
-                    elif unit in ["mcg", "ug"]:
-                        unit = "mcg"
-                    elif unit and ("kcal" in unit and "100" in unit):
-                        unit = "kcal/100g"
-                    elif unit in ["kcal/kg", "kcal / kg", "kcal.kg", "kcal", "cal/kg", "cal"]:
-                        unit = "kcal/kg"
-                    elif unit in ["kcal/sachê", "kcal/sache"]:
-                        unit = "kcal/sache"
-                    elif unit and ("mj" in unit and "kg" in unit):
-                        unit = "mj/kg"
-
-                    all_matches.append({
-                        "nutrient": nutrient,
-                        "value": value,
-                        "unit": unit,
-                        "matched_alias": alias,
-                        "start": match.start(),
-                        "end": match.end(),
-                        "full_text": match.group(0)
-                    })
-                except (ValueError, IndexError):
+                raw_val = match.group(1)
+                value = clean_numeric_value(raw_val)
+                
+                if value is None:
                     continue
+                    
+                unit = match.group(2).strip().lower() if match.group(2) else None
+                
+                # Normalização de unidades no parser
+                if unit in ["%", "por cento", "porcentagem"]:
+                    unit = "%"
+                elif unit in ["g/kg", "g / kg", "g.kg", "g"]:
+                    unit = "g/kg"
+                elif unit in ["mg/kg", "mg / kg", "mg.kg", "mg"]:
+                    unit = "mg/kg"
+                elif unit in ["ui/kg", "ui / kg", "ui.kg", "ui", "u.i.", "u.i"]:
+                    unit = "ui/kg"
+                elif unit in ["mcg", "ug"]:
+                    unit = "mcg"
+                elif unit and ("kcal" in unit and "100" in unit):
+                    unit = "kcal/100g"
+                elif unit in ["kcal/kg", "kcal / kg", "kcal.kg", "kcal", "cal/kg", "cal"]:
+                    unit = "kcal/kg"
+                elif unit in ["kcal/sachê", "kcal/sache"]:
+                    unit = "kcal/sache"
+                elif unit and ("mj" in unit and "kg" in unit):
+                    unit = "mj/kg"
 
-    # Resolve conflitos: prioriza a ordem de aparecimento no texto.
-    # Se dois matches começam na mesma posição, prioriza o mais longo.
+                all_matches.append({
+                    "nutrient": nutrient,
+                    "value": value,
+                    "unit": unit,
+                    "matched_alias": alias,
+                    "start": match.start(),
+                    "end": match.end(),
+                    "full_text": match.group(0)
+                })
+
     all_matches.sort(key=lambda x: (x["start"], -(x["end"] - x["start"])))
-    
     used_positions = set()
     
     for m in all_matches:
-        # v1.3.14: Lógica de sobreposição e coexistência definitiva.
-        # Ignoramos se a posição inicial já foi consumida.
         is_overlapping = False
         for p in range(m["start"], m["end"]):
             if p in used_positions:
@@ -204,7 +128,6 @@ def parse_nutrition(
         if is_overlapping:
             continue
             
-        # Criamos uma chave única baseada no nutriente e na posição para permitir a extração
         nut_key = f"{m['nutrient']}_{m['start']}"
         parsed[nut_key] = {
             "nutrient": m["nutrient"],

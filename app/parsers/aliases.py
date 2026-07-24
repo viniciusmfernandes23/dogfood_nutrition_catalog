@@ -17,6 +17,8 @@ NUTRIENT_ALIASES = {
         "extrato etereo",
         "ee",
         "gordura",
+        "gordura bruta",
+        "extrato etéreo bruto",
         "lipídios",
         "lipidios",
         r"extrato etéreo \(mín\.?\)",
@@ -39,6 +41,8 @@ NUTRIENT_ALIASES = {
         "matéria mineral",
         "materia mineral",
         "cinzas",
+        "cinzas brutas",
+        "material mineral",
         "mm",
         r"matéria mineral \(máx\.?\)",
         r"materia mineral \(max\.?\)",
@@ -111,8 +115,8 @@ NUTRIENT_ALIASES = {
         "em",
         "valor energético",
         "valor energetico",
-        "energia metabolizável (mín)",
-        "energia metabolizavel (min)",
+        r"energia metabolizável \(mín\.?\)",
+        r"energia metabolizavel \(min\.?\)",
     ],
 
     # ------------------------------------------------------
