@@ -35,12 +35,13 @@ O sistema utiliza um motor de resolução (`Resolver`) que processa cada nutrien
 Após a normalização individual, o sistema realiza validações cruzadas para detectar erros de coleta ou rotulagem.
 
 ### Balanço de Massa (Prioridade Crítica)
-A soma dos macronutrientes principais (**Proteína + Gordura + Fibra + Cinzas + Umidade**) é validada para garantir que o produto seja nutricionalmente plausível.
-*   **Intervalo Alvo**: **850 a 1050 g/kg**.
-*   **Ações**:
-    *   **< 850 g/kg**: O produto é marcado para **Auditoria (`REVIEW`)**. Indica possível falta de dados ou erro de escala.
-    *   **> 1050 g/kg**: O produto é marcado como **Falha Crítica (`FAILED`)** e os valores são anulados. É fisicamente impossível ter mais de 1000g de nutrientes em 1kg de produto.
-*   **Impacto na Energia**: Se o balanço de massa falha criticamente, a **Energia Metabolizável também é anulada**, pois o cálculo calórico depende da precisão dos macros.
+A soma dos macronutrientes principais (**Proteína + Gordura + Fibra + Cinzas + Umidade**) é validada para garantir que o produto seja nutricionalmente plausível, acomodando carboidratos (NFE) não declarados.
+*   **Intervalo Alvo (v1.5.6)**: **600 a 1050 g/kg**.
+*   **Classificação em Três Níveis**:
+    *   **OK (NORMALIZED)**: 600 – 1050 g/kg.
+    *   **REVIEW**: 500 – 600 ou 1050 – 1100 g/kg (Marcado para auditoria manual). Indica possível falta de dados ou erro de escala leve.
+    *   **FAILED**: < 500 ou > 1100 g/kg (Reprovado e valores anulados). É fisicamente impossível ter mais de 1100g de nutrientes (considerando margem de erro) em 1kg de produto.
+*   **Impacto na Energia**: Se o balanço de massa falha criticamente (`FAILED`), a **Energia Metabolizável também é anulada**, pois o cálculo calórico depende da precisão dos macros.
 
 ### Razão Cálcio : Fósforo (Ca:P)
 *   **Regra**: A relação entre Cálcio e Fósforo deve estar entre **1:1 e 2:1**.

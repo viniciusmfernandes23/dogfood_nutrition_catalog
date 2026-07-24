@@ -167,19 +167,19 @@ class NormalizationEngine:
                 min_sum = 850.0
                 max_sum = 1050.0
                 
-                # v1.5.0: BALANÇO EM TRÊS NÍVEIS
-                # OK: 850–1050 g/kg
-                # REVIEW: 700–850 ou 1050–1150 g/kg
-                # FAILED: < 700 ou > 1150 g/kg
+                # v1.5.6: RECALIBRAÇÃO CRÍTICA (Fiel ao Relatório v2.0.0)
+                # OK: 600–1050 g/kg (Acomoda carboidratos/NFE não declarados)
+                # REVIEW: 500–600 ou 1050–1100 g/kg
+                # FAILED: < 500 ou > 1100 g/kg
                 
                 status = ValidationStatus.NORMALIZED
                 reason = None
                 
-                if 850 <= macro_sum <= 1050:
+                if 600 <= macro_sum <= 1050:
                     status = ValidationStatus.NORMALIZED
-                elif (700 <= macro_sum < 850) or (1050 < macro_sum <= 1150):
+                elif (500 <= macro_sum < 600) or (1050 < macro_sum <= 1100):
                     status = ValidationStatus.REVIEW
-                    reason = f"Mass balance audit required: {macro_sum}g/kg (Borderline)"
+                    reason = f"Mass balance audit required: {macro_sum}g/kg (Borderline/NFE)"
                 else:
                     status = ValidationStatus.PRODUCT_MASS_BALANCE_FAILED
                     reason = f"Mass balance failed: {macro_sum}g/kg (Implausible)"
