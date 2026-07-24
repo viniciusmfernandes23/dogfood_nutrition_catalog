@@ -37,7 +37,6 @@ class ProductDimension(WarehouseModel):
     indication: str | None = None
     product_line: str | None = None
     is_transgenic: str | None = None
-    gender: str | None = None
     image_url: str | None = None
     
     has_guarantee_levels: bool = False

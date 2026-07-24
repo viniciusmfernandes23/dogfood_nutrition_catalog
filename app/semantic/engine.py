@@ -43,6 +43,9 @@ class SemanticEngine:
         "description",
         "category",
         "ingredients",
+        "indication",
+        "product_line",
+        "product_type",
     )
 
     def __init__(self) -> None:
@@ -183,59 +186,53 @@ class SemanticEngine:
                 row,
             )
 
-            # v1.4.0: Só aplica classificação semântica se o campo estiver vazio
+            # v1.5.2: Lógica refinada de priorização Ficha Técnica vs Semântica
+            
+            # 1. Product Category
+            # Se vier da ficha técnica (product_category), mantemos. Caso contrário, inferimos.
             if pd.isna(df.at[index, "product_category"]) or str(df.at[index, "product_category"]).strip() == "":
-                df.at[
-                    index,
-                    "product_category",
-                ] = self._enum_value(
-                    semantic["product_category"],
-                )
+                df.at[index, "product_category"] = self._enum_value(semantic["product_category"])
 
+            # 2. Life Stage
+            # Prioridade: Ficha Técnica (life_stage) -> Inferência Semântica (Nome/Indicação)
             if pd.isna(df.at[index, "life_stage"]) or str(df.at[index, "life_stage"]).strip() == "":
-                df.at[
-                    index,
-                    "life_stage",
-                ] = self._enum_value(
-                    semantic["life_stage"],
-                )
+                df.at[index, "life_stage"] = self._enum_value(semantic["life_stage"])
 
+            # 3. Breed Size
             if pd.isna(df.at[index, "breed_size"]) or str(df.at[index, "breed_size"]).strip() == "":
-                df.at[
-                    index,
-                    "breed_size",
-                ] = self._enum_value(
-                    semantic["breed_size"],
+                df.at[index, "breed_size"] = self._enum_value(semantic["breed_size"])
+
+            # 4. Product Tier
+            # v1.5.2: Prioriza 'Super Premium' se detectado no product_type ou product_line da ficha técnica
+            tier_override = None
+            ptype = str(row.get("product_type", "")).lower()
+            pline = str(row.get("product_line", "")).lower()
+            if "super premium" in ptype or "super premium" in pline:
+                tier_override = ProductTier.SUPER_PREMIUM.value
+            elif "premium especial" in ptype or "premium especial" in pline:
+                tier_override = ProductTier.PREMIUM_SPECIAL.value
+            elif "premium" in ptype or "premium" in pline:
+                tier_override = ProductTier.PREMIUM.value
+            
+            if tier_override:
+                df.at[index, "product_tier"] = tier_override
+            else:
+                df.at[index, "product_tier"] = self._enum_value(
+                    semantic["product_tier"],
+                    ProductTier.STANDARD.value,
                 )
 
-            df.at[
-                index,
-                "clinical_category",
-            ] = self._enum_value(
+            # 5. Clinical Category
+            df.at[index, "clinical_category"] = self._enum_value(
                 semantic["clinical_category"],
                 ClinicalCategory.NONE.value,
             )
 
+            # 6. Protein Source
             proteins = semantic["protein_source"]
-
-            df.at[
-                index,
-                "protein_source",
-            ] = (
-                ", ".join(
-                    protein.value
-                    for protein in proteins
-                )
-                if proteins
-                else ProteinSource.UNKNOWN.value
-            )
-
-            df.at[
-                index,
-                "product_tier",
-            ] = self._enum_value(
-                semantic["product_tier"],
-                ProductTier.STANDARD.value,
+            df.at[index, "protein_source"] = (
+                ", ".join(protein.value for protein in proteins)
+                if proteins else ProteinSource.UNKNOWN.value
             )
 
         # Adiciona scores nutricionais categorizados

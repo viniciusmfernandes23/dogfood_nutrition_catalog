@@ -105,6 +105,9 @@ LIFESTAGE_RULES = MappingProxyType({
         "puppy",
         "junior",
         "júnior",
+        "papinha",
+        "desmame",
+        "crescimento",
     ),
 
     LifeStage.ADULT: (
@@ -140,8 +143,10 @@ BREED_SIZE_RULES = MappingProxyType({
 
     BreedSize.SMALL: (
         "pequeno porte",
+        "porte pequeno",
         "small",
         "small breed",
+        "mini",
     ),
 
     BreedSize.MEDIUM: (

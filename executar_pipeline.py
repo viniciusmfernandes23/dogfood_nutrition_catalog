@@ -161,6 +161,7 @@ def run_extraction():
                 # Extrair Especificações (Ficha Técnica)
                 # Na VTEX, especificações costumam vir em campos como 'Porte', 'Idade', etc.
                 # ou dentro de uma lista de especificações se o mapeamento for genérico.
+                # v1.5.2: Mapeamento exaustivo da VTEX
                 spec_map = {
                     'Porte': 'breed_size',
                     'Tipo da ração': 'product_type',
@@ -172,16 +173,28 @@ def run_extraction():
                     'Linha': 'product_line',
                     'Transgênico': 'is_transgenic',
                     'Marca': 'brand_spec',
-                    'Gênero': 'gender',
                     'Seção': 'product_category'
                 }
                 
-                for vtex_key, internal_key in spec_map.items():
-                    val = p.api_payload.get(vtex_key)
+                # A API VTEX pode retornar especificações em campos de primeiro nível
+                # ou dentro de uma lista de propriedades.
+                all_props = {}
+                # 1. Tentar campos de primeiro nível
+                for k, v in p.api_payload.items():
+                    if isinstance(v, list) and v:
+                        all_props[k] = v[0]
+                    elif isinstance(v, str):
+                        all_props[k] = v
+                
+                # 2. Tentar lista de especificações (se existir)
+                for item in p.api_payload.get("allSpecifications", []):
+                    val = p.api_payload.get(item)
                     if isinstance(val, list) and val:
-                        specifications[internal_key] = val[0]
-                    elif val:
-                        specifications[internal_key] = val
+                        all_props[item] = val[0]
+                
+                for vtex_key, internal_key in spec_map.items():
+                    if vtex_key in all_props:
+                        specifications[internal_key] = all_props[vtex_key]
 
             # v1.5.1: Proteção contra product_id vazio
             if not p.product_id:
@@ -279,10 +292,19 @@ def run_extraction():
             path = os.path.join(OUTPUT_DIR, 'warehouse', file)
             if os.path.exists(path):
                 w_df = pd.read_csv(path)
+                
+                # v1.5.2: Sanitização final de IDs vazios e remoção de colunas obsoletas
+                if "product_id" in w_df.columns:
+                    w_df = w_df.dropna(subset=["product_id"])
+                    w_df = w_df[w_df["product_id"].astype(str).str.strip() != ""]
+                
+                if "gender" in w_df.columns:
+                    w_df = w_df.drop(columns=["gender"])
+                
                 currency_cols = [c for c in w_df.columns if 'price' in c.lower()]
                 for col in currency_cols:
                     w_df[col] = w_df[col].apply(format_currency)
-                w_df.to_csv(path, index=False)
+                w_df.to_csv(path, index=False, encoding="utf-8-sig")
 
         print("\nPipeline concluído com sucesso!")
         print(f"Arquivos gerados na pasta: {OUTPUT_DIR}/warehouse/")
