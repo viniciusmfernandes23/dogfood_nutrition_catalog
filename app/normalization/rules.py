@@ -217,8 +217,8 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     # ------------------------------------------------------
     "magnesium_mgkg": NormalizationRule(
         field="magnesium_mgkg",
-        target_min=100,
-        target_max=2000,
+        target_min=10, # v1.5.4: Reduzido para acomodar rações de baixa densidade
+        target_max=5000,
         percent_factor=PERCENT_TO_MGKG_FACTOR,
         gkg_to_mgkg=True,
     ),
@@ -243,20 +243,20 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
     ),
     "copper_mgkg": NormalizationRule(
         field="copper_mgkg",
-        target_min=2,
-        target_max=100,
+        target_min=0.1, # v1.5.4: Reduzido conforme auditoria (ex: 0.84 mg/kg em úmidas)
+        target_max=150,
         decimal_shift_up=1,
     ),
     "selenium_mgkg": NormalizationRule(
         field="selenium_mgkg",
         target_min=0.01,
-        target_max=5,
+        target_max=10,
         decimal_shift_up=1,
     ),
     "iodine_mgkg": NormalizationRule(
         field="iodine_mgkg",
-        target_min=0.1,
-        target_max=20,
+        target_min=0.001, # v1.5.4: Reduzido conforme auditoria (ex: 0.0016 mg/kg)
+        target_max=30,
         decimal_shift_up=1,
     ),
     "manganese_mgkg": NormalizationRule(

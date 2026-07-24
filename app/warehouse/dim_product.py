@@ -62,26 +62,32 @@ class ProductDimensionBuilder:
             if pid is None or (isinstance(pid, str) and not pid.strip()) or (isinstance(pid, float) and pd.isna(pid)):
                 continue
 
+            # v1.5.4: Sanitização de quebras de linha para evitar corrupção do CSV
+            def clean_text(val):
+                if isinstance(val, str):
+                    return val.replace("\n", " ").replace("\r", " ").replace("\t", " ").strip()
+                return val
+
             records.append(
                 ProductDimension(
                     product_id=pid,
-                    brand=row.get("brand"),
-                    product_name=row.get("product_name"),
-                    product_url=row.get("product_url") or row.get("url"),
-                    product_category=row.get("product_category"),
-                    product_tier=row.get("product_tier"),
-                    life_stage=row.get("life_stage"),
-                    breed_size=row.get("breed_size"),
-                    protein_source=row.get("protein_source"),
-                    clinical_category=row.get("clinical_category"),
-                    product_type=row.get("product_type"),
-                    package_weight=row.get("package_weight"),
-                    contains_coloring=row.get("contains_coloring"),
-                    target_breeds=row.get("target_breeds"),
-                    indication=row.get("indication"),
-                    product_line=row.get("product_line"),
-                    is_transgenic=row.get("is_transgenic"),
-                    image_url=row.get("image_url"),
+                    brand=clean_text(row.get("brand")),
+                    product_name=clean_text(row.get("product_name")),
+                    product_url=clean_text(row.get("product_url") or row.get("url")),
+                    product_category=clean_text(row.get("product_category")),
+                    product_tier=clean_text(row.get("product_tier")),
+                    life_stage=clean_text(row.get("life_stage")),
+                    breed_size=clean_text(row.get("breed_size")),
+                    protein_source=clean_text(row.get("protein_source")),
+                    clinical_category=clean_text(row.get("clinical_category")),
+                    product_type=clean_text(row.get("product_type")),
+                    package_weight=clean_text(row.get("package_weight")),
+                    contains_coloring=clean_text(row.get("contains_coloring")),
+                    target_breeds=clean_text(row.get("target_breeds")),
+                    indication=clean_text(row.get("indication")),
+                    product_line=clean_text(row.get("product_line")),
+                    is_transgenic=clean_text(row.get("is_transgenic")),
+                    image_url=clean_text(row.get("image_url")),
                     has_guarantee_levels=self._has_guarantee_levels(row),
                     created_at=self.timestamp,
                     updated_at=self.timestamp,

@@ -40,6 +40,9 @@ class Resolver:
             nutrient.confidence = 0.0
             return nutrient
 
+        target_is_kcalkg = rule.field.endswith("_kcalkg") if rule else False
+        target_is_uikg = rule.field.endswith("_uikg") if rule else False
+
         # Barreira 1: Validação de percentuais antes da conversão
         if nutrient.original_unit == "%":
             if nutrient.value < 0 or nutrient.value > 100:
@@ -50,9 +53,17 @@ class Resolver:
                 nutrient.confidence = 0.0
                 return nutrient
 
-        # Barreira 2: Proteção contra valores astronômicos (outliers extremos)
-        # v1.5.0: Endurecido para evitar falsos positivos de escala.
-        if nutrient.value > 1_000_000:
+        # Barreira 2: Proteção contra valores astronômicos ou nulos
+        # v1.5.4: Valores 0 em nutrientes essenciais (como Cloro) são implausíveis.
+        if nutrient.value is not None and nutrient.value <= 0 and not target_is_kcalkg:
+            nutrient.original_value = nutrient.value
+            nutrient.value = None
+            nutrient.status = ValidationStatus.IMPLAUSIBLE
+            nutrient.rule_applied = "nullified_zero_value"
+            nutrient.confidence = 0.0
+            return nutrient
+
+        if nutrient.value is not None and nutrient.value > 1_000_000:
             nutrient.original_value = nutrient.value
             nutrient.value = None
             nutrient.status = ValidationStatus.IMPLAUSIBLE
@@ -62,9 +73,6 @@ class Resolver:
 
         if rule is None:
             return nutrient
-
-        target_is_kcalkg = rule.field.endswith("_kcalkg")
-        target_is_uikg = rule.field.endswith("_uikg")
 
         # Fluxo Determinístico para Energia Metabolizável
         if target_is_kcalkg:
@@ -91,16 +99,19 @@ class Resolver:
                 return nutrient
 
             if converted_value is not None:
-                # v1.5.1: Tratamento de erro de escala 10x na energia (ex: 13780 -> 1378)
+                # v1.5.4: Tratamento agressivo de erro de escala na energia (ex: 13780 -> 1378 ou 105515 -> 1055)
+                # Aceitamos até 10.000 kcal/kg para acomodar petiscos/suplementos energéticos antes da correção.
                 if converted_value > 9000:
-                    for factor in [10.0, 100.0]:
+                    for factor in [10.0, 100.0, 1000.0]:
                         test_val = converted_value / factor
+                        # Limite para energia de manutenção em rações é geralmente 3000-5000, 
+                        # mas aceitamos até 9000 para casos extremos.
                         if 500 <= test_val <= 9000:
                             nutrient.original_value = nutrient.value
                             nutrient.value = round(float(test_val), 2)
                             nutrient.status = ValidationStatus.AUTO_CORRECTED
                             nutrient.rule_applied = f"fix_energy_scale_{int(factor)}x"
-                            nutrient.confidence = 0.9
+                            nutrient.confidence = 0.95
                             return nutrient
 
                 if 500 <= converted_value <= 9000:
