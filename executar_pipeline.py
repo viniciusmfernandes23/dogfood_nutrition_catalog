@@ -162,20 +162,21 @@ def run_extraction():
                 # Na VTEX, especificações costumam vir em campos como 'Porte', 'Idade', etc.
                 # ou dentro de uma lista de especificações se o mapeamento for genérico.
                 # v1.5.5: Mapeamento exaustivo e dinâmico da VTEX
+                # v1.5.7: Mapeamento robusto com suporte a aliases da VTEX e customLabels
                 spec_map = {
-                    'Porte': 'breed_size',
-                    'Tipo da ração': 'product_type',
-                    'Peso da Ração': 'package_weight',
-                    'Idade': 'life_stage',
-                    'Corante': 'contains_coloring',
-                    'Raças de cachorro': 'target_breeds',
-                    'Indicação': 'indication',
-                    'Linha': 'product_line',
-                    'Transgênico': 'is_transgenic',
-                    'Marca': 'brand_spec',
-                    'Seção': 'product_category',
-                    'Departamento': 'product_dept',
-                    'Categoria': 'product_cat_vtex'
+                    'breed_size': ['Porte', 'Porte do Cão'],
+                    'product_type': ['Tipo da ração', 'Tipo da Ração', 'customLabel3 Classif Ração'],
+                    'package_weight': ['Peso da Ração', 'Peso'],
+                    'life_stage': ['Idade', 'Fase de Vida'],
+                    'contains_coloring': ['Corante'],
+                    'target_breeds': ['Raças de cachorro', 'Raças de Cachorro', 'Raça'],
+                    'indication': ['Indicação', 'Indicações'],
+                    'product_line': ['Linha', 'Linha do Produto'],
+                    'is_transgenic': ['Transgênico', 'Transgenico'],
+                    'brand_spec': ['Marca'],
+                    'product_category': ['Seção', 'customLabel2 Subcategoria', 'customLabel1 Categoria'],
+                    'product_dept': ['Departamento', 'customLabel0 Departamento'],
+                    'product_cat_vtex': ['Categoria']
                 }
                 
                 all_props = {}
@@ -200,9 +201,11 @@ def run_extraction():
                         if isinstance(val, list) and val:
                             all_props[spec] = val[0]
 
-                for vtex_key, internal_key in spec_map.items():
-                    if vtex_key in all_props:
-                        specifications[internal_key] = all_props[vtex_key]
+                for internal_key, vtex_keys in spec_map.items():
+                    for vtex_key in vtex_keys:
+                        if vtex_key in all_props and all_props[vtex_key]:
+                            specifications[internal_key] = all_props[vtex_key]
+                            break
                 
                 # Fallback para product_category usando Departamento/Categoria se Seção falhar
                 if not specifications.get('product_category'):

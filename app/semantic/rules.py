@@ -19,9 +19,13 @@ PRODUCT_CATEGORY_RULES = MappingProxyType({
 
     ProductCategory.DRY: (
         "ração seca",
+        "racao seca",
+        "ração",
+        "racao",
         "extrusada",
         "extrusado",
         "dry food",
+        "dry",
     ),
 
     ProductCategory.WET: (
@@ -72,6 +76,9 @@ PRODUCT_CATEGORY_RULES = MappingProxyType({
         "cookie",
         "biscoito",
         "treat",
+        "osso",
+        "palito",
+        "mastigável",
     ),
 
     ProductCategory.SUPPLEMENT: (
@@ -113,6 +120,8 @@ LIFESTAGE_RULES = MappingProxyType({
     LifeStage.ADULT: (
         "adulto",
         "adult",
+        "especial",
+        "específica",
     ),
 
     LifeStage.SENIOR: (
@@ -142,11 +151,14 @@ BREED_SIZE_RULES = MappingProxyType({
     ),
 
     BreedSize.SMALL: (
-        "pequeno porte",
-        "porte pequeno",
+        "pequeno",
+        "pequena",
         "small",
-        "small breed",
         "mini",
+        "anão",
+        "anao",
+        "raças pequenas",
+        "racas pequenas",
     ),
 
     BreedSize.MEDIUM: (

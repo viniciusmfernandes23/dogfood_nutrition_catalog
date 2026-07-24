@@ -5,17 +5,14 @@ from types import MappingProxyType
 PRODUCT_RULES = MappingProxyType({
 
     "Ração Seca": (
-
         "ração seca",
-
+        "racao seca",
+        "ração",
+        "racao",
         "extrusada",
-
         "extrusado",
-
         "dry food",
-
         "dry",
-
     ),
 
     "Ração Úmida": (

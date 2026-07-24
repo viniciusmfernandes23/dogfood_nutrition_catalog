@@ -6,6 +6,9 @@ from app.semantic.categories import (
     ClinicalCategory,
     ProductTier,
     ProteinSource,
+    ProductCategory,
+    LifeStage,
+    BreedSize,
 )
 from app.semantic.classifier import SemanticClassifier
 from app.semantic.rules import (
@@ -31,6 +34,9 @@ class SemanticEngine:
         "clinical_category",
         "protein_source",
         "product_tier",
+        "product_type",
+        "target_breeds",
+        "product_line",
         "score_macro",
         "score_micro",
         "score_amino",
@@ -52,28 +58,29 @@ class SemanticEngine:
 
         self.scoring = NutritionalScoring()
 
+        from app.semantic.rules import SEMANTIC_RULES
         self.product_classifier = SemanticClassifier(
-            PRODUCT_CATEGORY_RULES,
+            SEMANTIC_RULES["product_category"],
         )
 
         self.life_stage_classifier = SemanticClassifier(
-            LIFESTAGE_RULES,
+            SEMANTIC_RULES["life_stage"],
         )
 
         self.breed_classifier = SemanticClassifier(
-            BREED_SIZE_RULES,
+            SEMANTIC_RULES["breed_size"],
         )
 
         self.clinical_classifier = SemanticClassifier(
-            CLINICAL_RULES,
+            SEMANTIC_RULES["clinical_category"],
         )
 
         self.protein_classifier = SemanticClassifier(
-            PROTEIN_RULES,
+            SEMANTIC_RULES["protein_source"],
         )
 
         self.tier_classifier = SemanticClassifier(
-            PRODUCT_TIER_RULES,
+            SEMANTIC_RULES["product_tier"],
         )
 
     # ==========================================================
@@ -116,7 +123,10 @@ class SemanticEngine:
         if value is None:
             return default
 
-        return value.value
+        if isinstance(value, str):
+            return value
+
+        return value.value if hasattr(value, 'value') else str(value)
 
     # ==========================================================
     # Classificação
@@ -180,33 +190,50 @@ class SemanticEngine:
             if column not in df.columns:
                 df[column] = None
 
-        for index, row in df.iterrows():
-
-            semantic = self.classify_product(
-                row,
-            )
+        for index, _ in df.iterrows():
+            row = df.loc[index]
+            # v1.5.7: Garantimos que o texto de entrada para o classificador seja completo
+            text_context = self._build_text(row)
+            
+            # Recalculamos semantic para garantir que os classificadores usem o contexto completo
+            semantic = {
+                "product_category": self.product_classifier.classify(text_context),
+                "life_stage": self.life_stage_classifier.classify(text_context),
+                "breed_size": self.breed_classifier.classify(text_context),
+                "clinical_category": self.clinical_classifier.classify(text_context),
+                "protein_source": self.protein_classifier.classify_many(text_context),
+                "product_tier": self.tier_classifier.classify(text_context),
+            }
 
             # v1.5.2: Lógica refinada de priorização Ficha Técnica vs Semântica
             
             # 1. Product Category
-            # Se vier da ficha técnica (product_category), mantemos. Caso contrário, inferimos.
-            if pd.isna(df.at[index, "product_category"]) or str(df.at[index, "product_category"]).strip() == "":
-                df.at[index, "product_category"] = self._enum_value(semantic["product_category"])
+            if pd.isna(df.loc[index, "product_category"]) or str(df.loc[index, "product_category"]).strip() in ["", "nan", "None"]:
+                df.loc[index, "product_category"] = self._enum_value(semantic["product_category"])
 
             # 2. Life Stage
-            # Prioridade: Ficha Técnica (life_stage) -> Inferência Semântica (Nome/Indicação)
-            # v1.5.5: Reforçamos o fallback semântico garantindo que ele use o texto completo (nome + indicação)
-            if pd.isna(df.at[index, "life_stage"]) or str(df.at[index, "life_stage"]).strip() == "" or str(df.at[index, "life_stage"]).lower() == "nan":
-                # Tenta match no nome do produto primeiro (mais assertivo para idade)
+            if pd.isna(df.loc[index, "life_stage"]) or str(df.loc[index, "life_stage"]).strip() in ["", "nan", "None"]:
+                # Prioriza match no nome
                 name_match = self.life_stage_classifier.best_match(str(row.get("product_name", "")))
-                if name_match:
-                    df.at[index, "life_stage"] = name_match.value
-                else:
-                    df.at[index, "life_stage"] = self._enum_value(semantic["life_stage"])
+                df.loc[index, "life_stage"] = self._enum_value(name_match) if name_match else self._enum_value(semantic["life_stage"])
 
             # 3. Breed Size
-            if pd.isna(df.at[index, "breed_size"]) or str(df.at[index, "breed_size"]).strip() == "":
-                df.at[index, "breed_size"] = self._enum_value(semantic["breed_size"])
+            if pd.isna(df.loc[index, "breed_size"]) or str(df.loc[index, "breed_size"]).strip() in ["", "nan", "None"]:
+                df.loc[index, "breed_size"] = self._enum_value(semantic["breed_size"])
+
+            # 3.1 Product Type
+            if pd.isna(df.loc[index, "product_type"]) or str(df.loc[index, "product_type"]).strip() in ["", "nan", "None"]:
+                df.loc[index, "product_type"] = self._enum_value(semantic["product_category"])
+
+            # 3.2 Target Breeds (v1.5.7: Heurística baseada no nome se vazio)
+            if pd.isna(df.loc[index, "target_breeds"]) or str(df.loc[index, "target_breeds"]).strip() == "" or str(df.loc[index, "target_breeds"]).lower() == "nan":
+                # Se o nome contiver "Todas as Raças" ou for genérico, preenchemos
+                name_norm = str(row.get("product_name", "")).lower()
+                if "todas as racas" in name_norm or "racas pequenas e medias" in name_norm:
+                    df.loc[index, "target_breeds"] = "Todas as Raças"
+                elif "especifica" not in name_norm:
+                    # Se não for uma raça específica no nome, tendemos a colocar Todas as Raças como heurística
+                    df.loc[index, "target_breeds"] = "Todas as Raças"
 
             # 4. Product Tier
             # v1.5.3: Lógica dinâmica baseada na Ficha Técnica (Tipo da Ração / Linha)
@@ -243,23 +270,23 @@ class SemanticEngine:
                     break
             
             if tier_override:
-                df.at[index, "product_tier"] = tier_override
+                df.loc[index, "product_tier"] = tier_override
             else:
                 # Fallback para inferência semântica baseada no contexto geral (nome, descrição, etc)
-                df.at[index, "product_tier"] = self._enum_value(
+                df.loc[index, "product_tier"] = self._enum_value(
                     semantic["product_tier"],
                     ProductTier.STANDARD.value,
                 )
 
             # 5. Clinical Category
-            df.at[index, "clinical_category"] = self._enum_value(
+            df.loc[index, "clinical_category"] = self._enum_value(
                 semantic["clinical_category"],
                 ClinicalCategory.NONE.value,
             )
 
             # 6. Protein Source
             proteins = semantic["protein_source"]
-            df.at[index, "protein_source"] = (
+            df.loc[index, "protein_source"] = (
                 ", ".join(protein.value for protein in proteins)
                 if proteins else ProteinSource.UNKNOWN.value
             )

@@ -16,8 +16,13 @@ class SemanticClassifier:
         self,
         rules: Mapping[Enum, tuple[str, ...]],
     ) -> None:
-
-        self.rules = rules
+        # v1.5.7: Normaliza as regras no construtor para evitar problemas de acentuação
+        self.rules = {}
+        for cat, keywords in rules.items():
+            if isinstance(keywords, (list, tuple)):
+                self.rules[cat] = tuple(self.normalize_text(kw) for kw in keywords)
+            else:
+                self.rules[cat] = (self.normalize_text(str(keywords)),)
 
     # ==========================================================
     # Normalização
@@ -38,15 +43,10 @@ class SemanticClassifier:
         )
 
         text = "".join(
-
             char
-
             for char
-
             in text
-
             if not unicodedata.combining(char)
-
         )
 
         text = re.sub(
@@ -68,13 +68,8 @@ class SemanticClassifier:
     def _compile_pattern(
         keyword: str,
     ) -> re.Pattern[str]:
-
-        keyword = SemanticClassifier.normalize_text(
-            keyword,
-        )
-
         return re.compile(
-            rf"\b{re.escape(keyword)}\b",
+            rf"{re.escape(keyword)}",
             re.IGNORECASE,
         )
 
@@ -100,7 +95,7 @@ class SemanticClassifier:
     def classify(
         self,
         text: str | None,
-    ) -> Enum | None:
+    ) -> str | Enum | None:
 
         normalized = self.normalize_text(
             text,
@@ -120,8 +115,8 @@ class SemanticClassifier:
                 in keywords
 
             ):
-
-                return category
+                # v1.5.7: Retorna o valor se for Enum, senão a chave
+                return category.value if hasattr(category, 'value') else category
 
         return None
 
