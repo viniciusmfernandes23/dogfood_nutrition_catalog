@@ -11,39 +11,78 @@ from app.parsers.regex_patterns import (
     UNIT,
 )
 
+
 def clean_numeric_value(raw_val: str) -> float | None:
     """
     Limpa strings numéricas tratando separadores de milhar e decimais.
-    Ex: '3.700' -> 3700.0, '1.055,15' -> 1055.15
+
+    Regras (padrão brasileiro):
+      - Ponto + vírgula presentes  → ponto é milhar, vírgula é decimal
+        Ex: '1.055,15' → 1055.15
+      - Apenas vírgula             → vírgula é decimal
+        Ex: '7,5' → 7.5,  '26,0' → 26.0
+      - Apenas ponto               → heurística de milhar:
+          * Exatamente 3 dígitos após o ponto → milhar
+            Ex: '3.700' → 3700.0,  '4.052' → 4052.0
+          * Qualquer outro número de dígitos → decimal
+            Ex: '7.5' → 7.5,  '7.50' → 7.5,  '40.52' → 40.52
+      - Sem separador              → inteiro
+        Ex: '75' → 75.0
+
+    Nota sobre o fator de erro ×10:
+      O bug sistemático ocorre quando o HTML separa o número decimal em
+      elementos distintos (ex: <td>7</td><td>,5</td>), fazendo o
+      BeautifulSoup gerar "7\\n,5".  O html_parser.py normaliza esse padrão
+      antes de chamar o parser.  Aqui garantimos que, se a vírgula chegar
+      intacta no raw_val, ela seja corretamente convertida para ponto decimal
+      (replace(",", ".")) e nunca removida silenciosamente.
     """
+    if not isinstance(raw_val, str):
+        return None
+
+    # Remove espaços internos que possam ter sido introduzidos por formatação
+    raw_val = raw_val.strip()
+    if not raw_val:
+        return None
+
     try:
-        # Se tem vírgula e ponto, a vírgula é decimal (padrão BR)
+        # Caso 1: tem vírgula E ponto → padrão BR (ponto = milhar, vírgula = decimal)
         if "." in raw_val and "," in raw_val:
             return float(raw_val.replace(".", "").replace(",", "."))
-        
-        # Se tem apenas vírgula, é decimal
+
+        # Caso 2: apenas vírgula → vírgula é decimal
+        # IMPORTANTE: usar replace(",", ".") e NUNCA replace(",", "")
+        # para evitar o fator de erro ×10 (ex: '7,5' → 75 em vez de 7.5).
         if "," in raw_val:
             return float(raw_val.replace(",", "."))
-        
-        # Se tem apenas ponto, pode ser milhar (3.700) ou decimal (3.7)
+
+        # Caso 3: apenas ponto → heurística de milhar
         if "." in raw_val:
             parts = raw_val.split(".")
-            # Heurística: se a última parte tem 3 dígitos, é milhar (ex: 3.700, 10.530)
-            # A menos que seja um valor muito pequeno (ex: 1.234 pode ser milhar ou decimal, 
-            # mas em ração 1.234 kcal é improvável ser decimal se não tiver vírgula).
-            if len(parts[-1]) == 3:
+            # Heurística: exatamente 3 dígitos após o ponto → separador de milhar BR
+            # (ex: '3.700' → 3700, '4.052' → 4052, '10.530' → 10530)
+            # Qualquer outro caso → ponto decimal
+            # (ex: '7.5' → 7.5, '7.50' → 7.5, '40.52' → 40.52)
+            if len(parts) == 2 and len(parts[-1]) == 3 and parts[-1].isdigit():
                 return float(raw_val.replace(".", ""))
             return float(raw_val)
-            
+
+        # Caso 4: sem separador → inteiro
         return float(raw_val)
+
     except (ValueError, IndexError):
         return None
+
 
 def parse_nutrition(
     raw_text: Any,
 ) -> dict[str, dict[str, Any]]:
     """
     Extrai todos os nutrientes encontrados na seção 'Níveis de Garantia'.
+
+    O texto de entrada deve ter sido previamente normalizado pelo
+    html_parser.extract_guarantee_section(), que reconstitui números decimais
+    fragmentados por quebras de linha (bug de fator ×10).
     """
 
     if not isinstance(raw_text, str) or not raw_text.strip():
@@ -56,35 +95,50 @@ def parse_nutrition(
     for nutrient, aliases in NUTRIENT_ALIASES.items():
         for alias in aliases:
             boundary = r"\b" if (len(alias) <= 2 and re.match(r"^\w+$", alias)) else ""
-            
+
             if "\\" in alias or "(" in alias or ")" in alias:
                 pattern_str = alias
             elif "." in alias:
                 pattern_str = re.escape(alias).replace(r"\.", r"\.?")
             else:
                 pattern_str = re.escape(alias)
-                
-            # Regex de número que aceita separadores de milhar e decimais
+
+            # Regex de número que aceita separadores de milhar e decimais.
+            #
+            # Padrão: \d+(?:[.,]\d+)*
+            #   - \d+          → parte inteira obrigatória
+            #   - (?:[.,]\d+)* → zero ou mais grupos de (separador + dígitos)
+            #
+            # Isso captura corretamente:
+            #   '7,5'     → '7,5'   (decimal BR)
+            #   '3.700'   → '3.700' (milhar BR)
+            #   '4.052'   → '4.052' (milhar BR)
+            #   '1.055,15'→ '1.055,15' (milhar + decimal BR)
+            #
+            # O SEPARATOR = r"[^0-9%]{0,50}?" (lazy, exclui dígitos e '%')
+            # garante que a vírgula decimal nunca seja consumida pelo separador,
+            # pois ela é sempre precedida por um dígito que o SEPARATOR não pode
+            # consumir.
             NUMBER_EXT = r"(\d+(?:[.,]\d+)*)"
             pattern = re.compile(
                 rf"{boundary}{pattern_str}{boundary}"
-                rf"[:\s]*" 
+                rf"[:\s]*"
                 rf"{SEPARATOR}"
                 rf"{NUMBER_EXT}"
                 rf"\s*"
                 rf"{UNIT}",
                 FLAGS,
             )
-            
+
             for match in pattern.finditer(text):
                 raw_val = match.group(1)
                 value = clean_numeric_value(raw_val)
-                
+
                 if value is None:
                     continue
-                    
+
                 unit = match.group(2).strip().lower() if match.group(2) else None
-                
+
                 # Normalização de unidades no parser
                 if unit in ["%", "por cento", "porcentagem"]:
                     unit = "%"
@@ -117,17 +171,17 @@ def parse_nutrition(
 
     all_matches.sort(key=lambda x: (x["start"], -(x["end"] - x["start"])))
     used_positions = set()
-    
+
     for m in all_matches:
         is_overlapping = False
         for p in range(m["start"], m["end"]):
             if p in used_positions:
                 is_overlapping = True
                 break
-        
+
         if is_overlapping:
             continue
-            
+
         nut_key = f"{m['nutrient']}_{m['start']}"
         parsed[nut_key] = {
             "nutrient": m["nutrient"],
@@ -137,7 +191,7 @@ def parse_nutrition(
             "start": m["start"],
             "end": m["end"]
         }
-        
+
         for p in range(m["start"], m["end"]):
             used_positions.add(p)
 
