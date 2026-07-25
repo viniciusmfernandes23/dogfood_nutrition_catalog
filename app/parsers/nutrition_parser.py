@@ -74,6 +74,78 @@ def clean_numeric_value(raw_val: str) -> float | None:
         return None
 
 
+def parse_value(
+    text: str,
+    aliases: list[str],
+) -> tuple[float | None, str | None, str | None]:
+    """
+    Procura o primeiro valor correspondente aos aliases informados no texto.
+
+    Retorna uma tupla (value, unit, alias) onde:
+      - value: o valor numérico extraído (float) ou None se não encontrado
+      - unit: a unidade normalizada (str) ou None
+      - alias: o alias que produziu o match (str) ou None
+
+    Internamente usa clean_numeric_value() para garantir que separadores
+    decimais BR sejam tratados corretamente e evitar o fator de erro ×10.
+    """
+    for alias in aliases:
+        boundary = r"\b" if (len(alias) <= 2 and re.match(r"^\w+$", alias)) else ""
+
+        if "\\" in alias or "(" in alias or ")" in alias:
+            pattern_str = alias
+        elif "." in alias:
+            pattern_str = re.escape(alias).replace(r"\.", r"\.?")
+        else:
+            pattern_str = re.escape(alias)
+
+        NUMBER_EXT = r"(\d+(?:[.,]\d+)*)"
+        pattern = re.compile(
+            rf"{boundary}{pattern_str}{boundary}"
+            rf"[:\s]*"
+            rf"{SEPARATOR}"
+            rf"{NUMBER_EXT}"
+            rf"\s*"
+            rf"{UNIT}",
+            FLAGS,
+        )
+
+        match = pattern.search(text)
+        if not match:
+            continue
+
+        raw_val = match.group(1)
+        value = clean_numeric_value(raw_val)
+        if value is None:
+            continue
+
+        unit = match.group(2).strip().lower() if match.group(2) else None
+
+        # Normalização de unidades (espelho do parse_nutrition)
+        if unit in ["%", "por cento", "porcentagem"]:
+            unit = "%"
+        elif unit in ["g/kg", "g / kg", "g.kg", "g"]:
+            unit = "g/kg"
+        elif unit in ["mg/kg", "mg / kg", "mg.kg", "mg"]:
+            unit = "mg/kg"
+        elif unit in ["ui/kg", "ui / kg", "ui.kg", "ui", "u.i.", "u.i"]:
+            unit = "ui/kg"
+        elif unit in ["mcg", "ug"]:
+            unit = "mcg"
+        elif unit and ("kcal" in unit and "100" in unit):
+            unit = "kcal/100g"
+        elif unit in ["kcal/kg", "kcal / kg", "kcal.kg", "kcal", "cal/kg", "cal"]:
+            unit = "kcal/kg"
+        elif unit in ["kcal/sachê", "kcal/sache"]:
+            unit = "kcal/sache"
+        elif unit and ("mj" in unit and "kg" in unit):
+            unit = "mj/kg"
+
+        return (value, unit, alias)
+
+    return (None, None, None)
+
+
 def parse_nutrition(
     raw_text: Any,
 ) -> dict[str, dict[str, Any]]:

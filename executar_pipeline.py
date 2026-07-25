@@ -90,7 +90,29 @@ def _extract_sku_variations(api_payload: dict, marketplace: str = "Cobasi") -> l
                 "available": available,
                 "marketplace": marketplace
             })
-            
+
+    elif marketplace == "Petlove":
+        items = api_payload.get("variants", [])
+        for item in items:
+            sku_name = item.get("name")
+            package_weight_kg = _parse_weight_kg(sku_name)
+            price = item.get("price")
+            price_per_kg = None
+            if price is not None and package_weight_kg and package_weight_kg > 0:
+                price_per_kg = round(price / package_weight_kg, 4)
+            variations.append({
+                "sku_id": str(item.get("id")),
+                "sku_name": sku_name,
+                "ean": item.get("ean"),
+                "package_weight_kg": package_weight_kg,
+                "price": price,
+                "list_price": item.get("listPrice"),
+                "subscriber_price": item.get("subscriptionPrice"),
+                "price_per_kg": price_per_kg,
+                "available": item.get("stock", 0) > 0,
+                "marketplace": marketplace
+            })
+
     return variations
 
 
