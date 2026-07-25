@@ -19,6 +19,14 @@ class AuditReporter:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         report_path = os.path.join(self.output_dir, f"audit_report_{timestamp}.md")
         
+        # Guarda contra DataFrames vazios ou sem colunas esperadas
+        if fact_nutrient_df is None or fact_nutrient_df.empty or 'status' not in fact_nutrient_df.columns:
+            with open(report_path, "w", encoding="utf-8") as f:
+                f.write("# Relatório de Auditoria Automática do Pipeline\n\n")
+                f.write(f"**Data da Execução**: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n\n")
+                f.write("**Sem dados de nutrientes para auditar nesta execução.**\n")
+            return report_path
+        
         # 1. Estatísticas Gerais de Nutrientes
         total_collected = len(fact_nutrient_df)
         status_counts = fact_nutrient_df['status'].value_counts().to_dict()

@@ -22,7 +22,8 @@ def test_unit_conflict_handling(engine):
     df, _ = engine.normalize_dataframe(data)
     # g/kg = mg/kg / 1000
     assert df.at[0, "fat_gkg"] == 0.03
-    assert df.at[0, "fat_gkg_status"] == ValidationStatus.AUTO_CORRECTED
+    # A conversão direta de unidade resulta em NORMALIZED (não AUTO_CORRECTED)
+    assert df.at[0, "fat_gkg_status"] == ValidationStatus.NORMALIZED
 
     # Caso 2: tryptophan_mgkg original "2000 g/kg" -> 2.000.000 mg/kg (Implausível)
     data2 = pd.DataFrame({

@@ -150,8 +150,8 @@ class WarehouseExporter:
                 keep="last"
             )
             
-            # Aplica nomes amigáveis para exportação final (Power BI)
-            dataframe = SemanticLayer.apply_output_conversion(dataframe)
+            # Removido SemanticLayer.apply_output_conversion(dataframe)
+            # A conversão semântica causava dupla normalização, pois o motor já normaliza para a unidade alvo.
 
         # Formatação de Preços
         if filename == "fact_price_snapshot.csv":
@@ -255,6 +255,10 @@ class WarehouseExporter:
                         "timestamp": datetime.now().isoformat()
                     })
                 df.loc[mask, "nutrient_value"] = None
+                if "status" in df.columns:
+                    df.loc[mask, "status"] = "implausible"
+                if "reason" in df.columns:
+                    df.loc[mask, "reason"] = reason
 
     def _count_rows(self, path: Path) -> int:
         if not path.exists():
@@ -263,6 +267,12 @@ class WarehouseExporter:
             return len(pd.read_csv(path))
         except Exception:
             return 0
+
+    def list_exported_files(self) -> list[str]:
+        """
+        Lista todos os arquivos CSV exportados no diretório de saída.
+        """
+        return [str(f) for f in self.output_dir.glob("*.csv") if f.is_file()]
 
     def clean_output_directory(self, full_clean: bool = False) -> None:
         """

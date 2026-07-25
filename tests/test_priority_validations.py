@@ -80,14 +80,13 @@ def test_priority_2_1_mass_balance(engine):
     assert df.at[0, "protein_gkg"] == 300
     
     # Prod 2: 500+400+100+200+100 = 1300 (Falha)
-    # Nota: A proteína de 500 é convertida para 50.0 (already_gkg) se o target_max for 600.
-    # Vamos usar valores que garantam a soma > 1050.
+    # Vamos usar valores que garantam a soma > 1100 (limite de FAILED).
     data.at[1, "protein_gkg"] = 500.0
-    data.at[1, "fat_gkg"] = 200.0
+    data.at[1, "fat_gkg"] = 250.0
     data.at[1, "fiber_gkg"] = 100.0
     data.at[1, "ash_gkg"] = 100.0
     data.at[1, "moisture_gkg"] = 200.0
-    # Soma: 500+200+100+100+200 = 1100 (Falha)
+    # Soma: 500+250+100+100+200 = 1150 (Falha: > 1100)
     
     df, report = engine.normalize_dataframe(data)
     

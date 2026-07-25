@@ -9,10 +9,9 @@ from app.warehouse.dim_product import ProductDimensionBuilder
 def test_metabolizable_energy_conversions():
     engine = NormalizationEngine()
     
-    # v1.5.1: 
-    # 1. 13780 -> 1378 (fix_10x)
-    # 2. 105515 -> 1055.15 (fix_100x)
-    # 3. 3700 com ponto (milhar) -> 3700
+    # CORREÇÃO DO BUG: fix_energy_scale era uma dupla normalização.
+    # Após a correção, valores com unidade explícita que resultam em valores fora
+    # do intervalo biológico são anulados, não "corrigidos" por heurística de escala.
     
     data = {
         "product_id": [1, 2, 3, 4],
@@ -22,48 +21,48 @@ def test_metabolizable_energy_conversions():
     df = pd.DataFrame(data)
     norm_df, _ = engine.normalize_dataframe(df)
     
-    # 13780 -> 1378
-    assert norm_df.loc[0, "metabolizable_energy_kcalkg"] == 1378.0
-    assert "fix_energy_scale_10x" in norm_df.loc[0, "metabolizable_energy_kcalkg_rule"]
+    # 13780 kcal/kg -> 13780 > 9000 -> IMPLAUSIBLE (não mais fix_10x)
+    assert pd.isna(norm_df.loc[0, "metabolizable_energy_kcalkg"])
+    assert norm_df.loc[0, "metabolizable_energy_kcalkg_status"] == ValidationStatus.BIOLOGICALLY_IMPLAUSIBLE_ENERGY
     
-    # 105515 -> 1055.15
-    assert norm_df.loc[1, "metabolizable_energy_kcalkg"] == 1055.15
-    assert "fix_energy_scale_100x" in norm_df.loc[1, "metabolizable_energy_kcalkg_rule"]
+    # 105515 kcal/kg -> 105515 > 9000 -> IMPLAUSIBLE (não mais fix_100x)
+    assert pd.isna(norm_df.loc[1, "metabolizable_energy_kcalkg"])
+    assert norm_df.loc[1, "metabolizable_energy_kcalkg_status"] == ValidationStatus.BIOLOGICALLY_IMPLAUSIBLE_ENERGY
     
-    # 3700 -> 3700
+    # 3700 kcal/kg -> 3700 (OK, dentro do intervalo 500-9000)
     assert norm_df.loc[2, "metabolizable_energy_kcalkg"] == 3700.0
     
-    # 477 kcal/100g -> 4770 kcal/kg
+    # 477 kcal/100g -> 4770 kcal/kg (conversão determinística, dentro do intervalo)
     assert norm_df.loc[3, "metabolizable_energy_kcalkg"] == 4770.0
 
 def test_mass_balance_validation():
     engine = NormalizationEngine()
     
-    # v1.5.0:
-    # OK: 850–1050 g/kg
-    # REVIEW: 700–850 ou 1050–1150 g/kg
-    # FAILED: < 700 ou > 1150 g/kg
+    # v2.0.0 (LIMITES RECALIBRADOS):
+    # OK: 600–1050 g/kg (acomoda NFE/carboidratos não declarados)
+    # REVIEW: 500–600 ou 1050–1100 g/kg
+    # FAILED: < 500 ou > 1100 g/kg
     
     data = {
         "product_id": [1, 2, 3, 4, 5],
         "product_category": ["Ração Seca"] * 5,
-        "protein_gkg": [300, 250, 400, 200, 500],
+        "protein_gkg": [300, 250, 400, 100, 500],
         "fat_gkg": [150, 100, 200, 100, 250],
         "fiber_gkg": [50, 50, 100, 50, 100],
         "ash_gkg": [100, 100, 100, 100, 100],
-        "moisture_gkg": [300, 300, 300, 200, 300],
+        "moisture_gkg": [300, 300, 300, 100, 300],
     }
-    # Soma 1: 900 (OK)
-    # Soma 2: 800 (REVIEW)
-    # Soma 3: 1100 (REVIEW)
-    # Soma 4: 650 (FAILED)
-    # Soma 5: 1250 (FAILED)
+    # Soma 1: 300+150+50+100+300 = 900 (OK: 600-1050)
+    # Soma 2: 250+100+50+100+300 = 800 (OK: 600-1050)
+    # Soma 3: 400+200+100+100+300 = 1100 (REVIEW: 1050-1100)
+    # Soma 4: 100+100+50+100+100 = 450 (FAILED: < 500)
+    # Soma 5: 500+250+100+100+300 = 1250 (FAILED: > 1100)
     
     df = pd.DataFrame(data)
     norm_df, _ = engine.normalize_dataframe(df)
     
     assert norm_df.loc[0, "protein_gkg_status"] == ValidationStatus.NORMALIZED
-    assert norm_df.loc[1, "protein_gkg_status"] == ValidationStatus.REVIEW
+    assert norm_df.loc[1, "protein_gkg_status"] == ValidationStatus.NORMALIZED
     assert norm_df.loc[2, "protein_gkg_status"] == ValidationStatus.REVIEW
     assert norm_df.loc[3, "protein_gkg_status"] == ValidationStatus.PRODUCT_MASS_BALANCE_FAILED
     assert norm_df.loc[4, "protein_gkg_status"] == ValidationStatus.PRODUCT_MASS_BALANCE_FAILED
@@ -106,15 +105,23 @@ def test_scale_fix_and_ui():
     # Para ser não ambíguo, precisamos de um valor que após uma divisão caia no range e após outra não.
     # Se usarmos um valor como 160: /10=16 (Válido), /100=1.6 (Inválido < 10).
     
+    # CORREÇÃO DO BUG: ash_gkg=160 com unit=g/kg explícita e 160 > target_max=150
+    # Antes: o resolver aplicava fix_10x_scale_down (dupla normalização)
+    # Depois: com unidade explícita e valor fora do range, o dado é anulado (IMPLAUSIBLE)
+    # Heurísticas de escala só se aplicam quando NÃO há unidade explícita
     data2 = {
-        "product_id": [3],
-        "ash_gkg": [160.0],
-        "ash_unit": ["g/kg"]
+        "product_id": [3, 4],
+        "ash_gkg": [160.0, 160.0],
+        "ash_unit": ["g/kg", None]  # Com e sem unidade explícita
     }
     df2 = pd.DataFrame(data2)
     norm_df2, _ = engine.normalize_dataframe(df2)
-    assert norm_df2.loc[0, "ash_gkg"] == 16.0
-    assert "fix_10x_scale_down" in norm_df2.loc[0, "ash_gkg_rule"]
+    # Com unidade explícita g/kg e valor 160 > 150: IMPLAUSIBLE
+    assert pd.isna(norm_df2.loc[0, "ash_gkg"])
+    assert norm_df2.loc[0, "ash_gkg_status"] == ValidationStatus.IMPLAUSIBLE
+    # Sem unidade explícita e valor 160 > 150: heurística fix_10x -> 16.0
+    assert norm_df2.loc[1, "ash_gkg"] == 16.0
+    assert "fix_10x_scale_down" in norm_df2.loc[1, "ash_gkg_rule"]
 
 def test_dim_product_enrichment():
     data = {

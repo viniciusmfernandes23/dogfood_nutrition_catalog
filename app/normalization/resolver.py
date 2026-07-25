@@ -99,21 +99,13 @@ class Resolver:
                 return nutrient
 
             if converted_value is not None:
-                # v1.5.4: Tratamento agressivo de erro de escala na energia (ex: 13780 -> 1378 ou 105515 -> 1055)
-                # Aceitamos até 10.000 kcal/kg para acomodar petiscos/suplementos energéticos antes da correção.
-                if converted_value > 9000:
-                    for factor in [10.0, 100.0, 1000.0]:
-                        test_val = converted_value / factor
-                        # Limite para energia de manutenção em rações é geralmente 3000-5000, 
-                        # mas aceitamos até 9000 para casos extremos.
-                        if 500 <= test_val <= 9000:
-                            nutrient.original_value = nutrient.value
-                            nutrient.value = round(float(test_val), 2)
-                            nutrient.status = ValidationStatus.AUTO_CORRECTED
-                            nutrient.rule_applied = f"fix_energy_scale_{int(factor)}x"
-                            nutrient.confidence = 0.95
-                            return nutrient
-
+                # CORREÇÃO DO BUG (causa raiz #3):
+                # O bloco 'fix_energy_scale' aplicava uma correção de escala DEPOIS da conversão de unidade.
+                # Isso causava dupla normalização: a unidade já havia sido convertida (ex: kcal/100g -> kcal/kg),
+                # e o resultado era dividido novamente por 10/100/1000.
+                # Exemplo: 1200 kcal/100g -> 12000 kcal/kg (correto) -> /10 -> 1200 kcal/kg (errado).
+                # A conversão de unidade é determinística e não deve ser "corrigida" por heurística posterior.
+                # Valores fora do intervalo biológico após conversão são simplesmente implausíveis.
                 if 500 <= converted_value <= 9000:
                     nutrient.original_value = nutrient.value
                     nutrient.value = round(float(converted_value), 5)
@@ -155,9 +147,18 @@ class Resolver:
                     nutrient.confidence = 1.0
                     return nutrient
                 
-                # v1.5.0: Se a unidade explícita resulta em valor inválido,
-                # tentamos heurísticas de escala APENAS se o valor original for plausível de erro 10x/100x.
-                # Caso contrário, o dado é considerado incoerente.
+                # CORREÇÃO DO BUG (causa raiz #2):
+                # Quando a unidade é explícita e a conversão direta resulta em valor inválido,
+                # o dado é incoerente com os limites biológicos.
+                # NÃO devemos aplicar heurísticas de escala sobre o valor já convertido,
+                # pois isso causaria dupla normalização (conversão de unidade + correção de escala).
+                # O dado deve ser anulado com status IMPLAUSIBLE para preservar a rastreabilidade.
+                nutrient.original_value = nutrient.value
+                nutrient.value = None
+                nutrient.status = ValidationStatus.IMPLAUSIBLE
+                nutrient.rule_applied = f"unit_direct_{rule_name}_out_of_range"
+                nutrient.confidence = 0.0
+                return nutrient
 
         # Fallback 1: Valor sem unidade mas já válido
         if self.validator.is_valid(nutrient.value, rule):
@@ -320,33 +321,38 @@ class Resolver:
         if self.validator.is_valid(value, rule):
             return []
 
+        # Se a unidade for explícita e já tentamos a conversão direta (que falhou),
+        # não devemos aplicar correções de escala baseadas na conversão falha.
+        # As heurísticas de escala devem ser aplicadas APENAS no valor original.
+        base_value = nutrient.original_value if nutrient.original_value is not None else value
+        
         # Divisão por potências de 10 (Erros de escala/deslocamento de vírgula)
-        if value > rule.target_max:
+        if base_value > rule.target_max:
             for factor in [10.0, 100.0, 1000.0]:
-                test_val = value / factor
+                test_val = base_value / factor
                 if self.validator.is_valid(test_val, rule):
                     candidates.append((test_val, f"fix_{int(factor)}x_scale_down"))
 
         # Multiplicação por potências de 10 (Erros de escala/deslocamento de vírgula)
-        if value < rule.target_min:
+        if base_value < rule.target_min:
             for factor in [10.0, 100.0, 1000.0]:
-                test_val = value * factor
+                test_val = base_value * factor
                 if self.validator.is_valid(test_val, rule):
                     candidates.append((test_val, f"fix_{int(factor)}x_scale_up"))
 
         # Heurísticas específicas da regra (overscale, percent, gkg_to_mgkg)
         if rule.overscale_factor:
-            test_val = value / rule.overscale_factor
+            test_val = base_value / rule.overscale_factor
             if self.validator.is_valid(test_val, rule):
                 candidates.append((test_val, "rule_overscale"))
 
         if rule.percent_factor:
-            test_val = value * rule.percent_factor
+            test_val = base_value * rule.percent_factor
             if self.validator.is_valid(test_val, rule):
                 candidates.append((test_val, "rule_percent_conv"))
 
         if rule.gkg_to_mgkg:
-            test_val = value * GKG_TO_MGKG_FACTOR
+            test_val = base_value * GKG_TO_MGKG_FACTOR
             if self.validator.is_valid(test_val, rule):
                 candidates.append((test_val, "rule_gkg_to_mgkg"))
 

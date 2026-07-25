@@ -30,7 +30,9 @@ def test_energy_scale_correction_100x():
     resolver = Resolver()
     rule = get_rule("metabolizable_energy_kcalkg")
     
-    # Caso: 105515 kcal/kg -> deve ser corrigido para 1055.15 (100x)
+    # CORREÇÃO DO BUG: fix_energy_scale_100x era uma dupla normalização.
+    # 105515 kcal/kg com unidade explícita kcal/kg -> 105515 > 9000 -> IMPLAUSIBLE.
+    # Não deve ser dividido por 100 pois a unidade já foi convertida deterministicamente.
     from app.normalization.models import NormalizedNutrient
     nutrient = NormalizedNutrient(
         name="metabolizable_energy_kcalkg",
@@ -40,9 +42,8 @@ def test_energy_scale_correction_100x():
     )
     
     resolved = resolver.resolve(nutrient, rule)
-    assert resolved.value == 1055.15
-    assert resolved.status == "auto_corrected"
-    assert "100x" in resolved.rule_applied
+    assert resolved.value is None
+    assert resolved.status == "biologically_implausible_energy"
 
 def test_mineral_zero_implausibility():
     resolver = Resolver()
