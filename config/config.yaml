@@ -1,0 +1,86 @@
+# ============================================================================
+# Dogfood Nutrition Pipeline — Configuração Operacional
+# ============================================================================
+#
+# Este arquivo centraliza todos os parâmetros operacionais do pipeline.
+# Valores aqui definidos podem ser sobrescritos por variáveis de ambiente
+# (quando .env estiver presente) ou por argumentos de linha de comando.
+#
+# Formato: YAML
+# Encoding: UTF-8
+# ============================================================================
+
+pipeline:
+  # Diretório base para saída do pipeline
+  output_dir: output
+
+  # Diretório do warehouse (subdir de output_dir)
+  warehouse_dir: output/warehouse
+
+  # Modo padrão de execução: 'full' (API + Crawler) ou 'price' (apenas preços)
+  default_mode: full
+
+  # Se True, sobrescreve arquivos existentes no output
+  overwrite: true
+
+  # Se True, exporta CSVs
+  export_csv: true
+
+  # Se True, salva logs da execução
+  save_logs: true
+
+
+crawler:
+  # Número máximo de threads para o crawler paralelo
+  max_workers: 12
+
+  # Timeout em segundos por requisição HTTP
+  timeout: 15
+
+  # Número de retries antes de desistir
+  retries: 5
+
+  # Delay entre requests sequenciais (segundos)
+  request_delay: 0.3
+
+  # Número de produtos entre logs de progresso
+  progress_step: 20
+
+
+logging:
+  # Nível de log: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: INFO
+
+  # Formato: 'json' (produção) ou 'text' (desenvolvimento)
+  format: json
+
+  # Arquivo de log (opcional; se vazio, usa stdout)
+  log_file: ""
+
+
+collectors:
+  cobasi:
+    # Endpoint da API VTEX da Cobasi
+    endpoint: "https://cobasibr.vtexcommercestable.com.br"
+
+    # Page size para paginação da API
+    page_size: 50
+
+    # Queries de busca padrão
+    default_queries:
+      - "ração cachorro"
+
+  petlove:
+    # Base URL da Petlove
+    base_url: "https://www.petlove.com.br"
+
+    # Queries de busca padrão
+    default_queries:
+      - "ração cachorro premium"
+      - "ração cachorro adulto"
+      - "ração cachorro filhote"
+
+  petz:
+    # Placeholder para implementação futura
+    endpoint: ""
+    default_queries: []

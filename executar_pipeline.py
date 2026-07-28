@@ -107,12 +107,26 @@ def run_extraction():
         default=["Cobasi"],
         help="Lista de marketplaces a coletar (padrão: Cobasi)",
     )
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=12,
+        help="Número de threads para o crawler paralelo (padrão: 12)",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=15,
+        help="Timeout em segundos por requisição do crawler (padrão: 15)",
+    )
     args, _ = parser.parse_known_args()
 
     runner = PipelineRunner(
         output_dir=args.output_dir,
         mode=args.mode,
         marketplaces=args.marketplaces,
+        crawler_workers=args.max_workers,
+        crawler_timeout=args.timeout,
     )
 
     result = runner.run()

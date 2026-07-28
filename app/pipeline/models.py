@@ -57,6 +57,49 @@ class PipelineMetrics:
 
     finished_at: datetime | None = None
 
+    # ----------------------------------------------------------
+    # Métricas de Crawler (Sprint 1 — Paralelização)
+    # ----------------------------------------------------------
+    crawler_products_found: int = 0
+    crawler_products_processed: int = 0
+    crawler_products_discarded: int = 0
+    crawler_total_time_seconds: float = 0.0
+    crawler_avg_time_per_product_seconds: float = 0.0
+    crawler_total_retries: int = 0
+    crawler_success_rate: float = 0.0
+
+    # ----------------------------------------------------------
+    # Métricas de Parser (Sprint 2 — Observabilidade)
+    # ----------------------------------------------------------
+    parser_nutrients_found: int = 0
+    parser_nutrients_missing: int = 0
+    parser_success_rate: float = 0.0
+
+    # ----------------------------------------------------------
+    # Métricas de Normalização (Sprint 2 — Observabilidade)
+    # ----------------------------------------------------------
+    normalization_rules_applied: int = 0
+    normalization_discarded: int = 0
+
+    # ----------------------------------------------------------
+    # Métricas de Warehouse (Sprint 2 — Observabilidade)
+    # ----------------------------------------------------------
+    warehouse_files_exported: int = 0
+    warehouse_records_exported: int = 0
+
+    # ----------------------------------------------------------
+    # Métricas de Pipeline (Sprint 2 — Observabilidade)
+    # ----------------------------------------------------------
+    pipeline_throughput_products_per_second: float = 0.0
+
+    def compute_throughput(self) -> float:
+        """Calcula o throughput em produtos/segundo."""
+        if self.elapsed_seconds > 0:
+            self.pipeline_throughput_products_per_second = round(
+                self.products_normalized / self.elapsed_seconds, 2
+            )
+        return self.pipeline_throughput_products_per_second
+
     def start(self) -> None:
 
         self.started_at = datetime.now()

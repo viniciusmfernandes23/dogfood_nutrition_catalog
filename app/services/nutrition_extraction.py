@@ -6,6 +6,7 @@ Responsável por:
   2. Fazer o parse nutricional.
   3. Mapear nutrientes para colunas canônicas.
   4. Selecionar o melhor match por prioridade.
+  5. Reportar métricas ao PipelineMetricsCollector.
 """
 
 from __future__ import annotations
@@ -35,6 +36,9 @@ for rule_key in NORMALIZATION_RULES.keys():
     if short not in NUTRIENT_MAPPING and short + "_gkg" == rule_key:
         NUTRIENT_MAPPING[short] = rule_key
 
+# Nutrientes esperados (referência para métricas)
+EXPECTED_NUTRIENTS = set(NUTRIENT_MAPPING.keys())
+
 
 class NutritionExtractionService:
     """
@@ -49,6 +53,7 @@ class NutritionExtractionService:
         self,
         dataframe: pd.DataFrame,
         guarantee_column: str = "raw_guarantee",
+        metrics_collector: object | None = None,
     ) -> pd.DataFrame:
         """
         Para cada linha do DataFrame, faz o parse da coluna de garantia
@@ -67,14 +72,19 @@ class NutritionExtractionService:
         for col in nutrient_cols:
             if col not in dataframe.columns:
                 dataframe[col] = None
-            # Garante também a coluna de unidade original
             unit_col = f"{col}_unit"
             if unit_col not in dataframe.columns:
                 dataframe[unit_col] = None
 
+        # Contadores para métricas
+        total_nutrients_found = 0
+        total_nutrients_missing = 0
+        products_with_nutrients = 0
+
         for index, row in dataframe.iterrows():
             raw_guarantee = row.get(guarantee_column)
             if not raw_guarantee or (isinstance(raw_guarantee, float) and pd.isna(raw_guarantee)):
+                total_nutrients_missing += len(EXPECTED_NUTRIENTS)
                 continue
 
             nutrients = parse_nutrition(raw_guarantee)
@@ -86,10 +96,49 @@ class NutritionExtractionService:
 
             best_matches = self._select_best(nutrients)
 
+            if best_matches:
+                products_with_nutrients += 1
+
             for target_col, data in best_matches.items():
                 dataframe.at[index, target_col] = data["value"]
                 unit_col = f"{target_col}_unit"
                 dataframe.at[index, unit_col] = data.get("unit")
+                total_nutrients_found += 1
+
+            # Conta nutrientes ausentes (esperados mas não encontrados)
+            found_keys = {m["nutrient"] for m in best_matches.values() if "nutrient" in m}
+            # Contagem simplificada: nutrientes esperados que não foram mapeados
+            mapped = set()
+            for _nk, nd in best_matches.items():
+                # Inverter o mapeamento para saber quais chaves foram cobertas
+                pass
+            for nut_type, col in NUTRIENT_MAPPING.items():
+                if col not in best_matches:
+                    total_nutrients_missing += 1
+
+        # Reportar métricas
+        if metrics_collector and hasattr(metrics_collector, "metrics"):
+            m = metrics_collector.metrics
+            m.parser_nutrients_found = total_nutrients_found
+            m.parser_nutrients_missing = total_nutrients_missing
+            total_expected = len(dataframe) * len(EXPECTED_NUTRIENTS)
+            if total_expected > 0:
+                m.parser_success_rate = round(
+                    (total_nutrients_found / total_expected) * 100, 1
+                )
+
+        success_rate = (
+            round((products_with_nutrients / len(dataframe)) * 100, 1)
+            if len(dataframe) > 0
+            else 0
+        )
+        logger.info(
+            "  Extração concluída: %d/%d produtos com nutrientes (%.1f%%), %d nutrientes extraídos",
+            products_with_nutrients,
+            len(dataframe),
+            success_rate,
+            total_nutrients_found,
+        )
 
         return dataframe
 
@@ -119,6 +168,7 @@ class NutritionExtractionService:
                     "value": nut_data["value"],
                     "unit": nut_data.get("unit"),
                     "priority": priority,
+                    "nutrient": nut_type,
                 }
 
         return best_matches
