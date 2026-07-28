@@ -87,6 +87,9 @@ class PipelineSummaryReporter:
                 "success_rate": getattr(m, "crawler_success_rate", 0),
             },
             "parser": {
+                "nutrients_parsed": getattr(m, "parser_nutrients_parsed", 0),
+                "nutrients_mapped": getattr(m, "parser_nutrients_mapped", 0),
+                "products_with_nutrients": getattr(m, "parser_products_with_nutrients", 0),
                 "nutrients_found": getattr(m, "parser_nutrients_found", 0),
                 "nutrients_missing": getattr(m, "parser_nutrients_missing", 0),
                 "success_rate": getattr(m, "parser_success_rate", 0),
@@ -95,10 +98,12 @@ class PipelineSummaryReporter:
                 "changes": m.normalization_changes,
                 "rules_applied": getattr(m, "normalization_rules_applied", 0),
                 "discarded": getattr(m, "normalization_discarded", 0),
+                "nutrients_output": getattr(m, "normalization_nutrients_output", 0),
             },
             "warehouse": {
                 "files_exported": getattr(m, "warehouse_files_exported", 0),
                 "records_exported": getattr(m, "warehouse_records_exported", 0),
+                "fact_nutrient_records": getattr(m, "warehouse_fact_nutrient_records", 0),
             },
             "pipeline": {
                 "total_time": format_duration(m.elapsed_seconds),
@@ -132,7 +137,8 @@ class PipelineSummaryReporter:
         return (
             f"Parser\n"
             f"  {success_rate}% sucesso\n"
-            f"  Nutrientes encontrados: {m.parser_nutrients_found:,}\n"
+            f"  Nutrientes parseados: {getattr(m, 'parser_nutrients_parsed', 0):,}\n"
+            f"  Nutrientes mapeados: {getattr(m, 'parser_nutrients_mapped', 0):,}\n"
             f"  Nutrientes ausentes: {m.parser_nutrients_missing:,}"
         )
 
@@ -143,15 +149,18 @@ class PipelineSummaryReporter:
             f"Normalization\n"
             f"  {m.normalization_changes} correções\n"
             f"  Regras aplicadas: {rules_applied}\n"
+            f"  Nutrientes de saída: {getattr(m, 'normalization_nutrients_output', 0):,}\n"
             f"  Descartados: {discarded}"
         )
 
     def _warehouse_section(self, m: PipelineMetrics) -> str:
         files = getattr(m, "warehouse_files_exported", 0)
         records = getattr(m, "warehouse_records_exported", 0)
+        fact_records = getattr(m, "warehouse_fact_nutrient_records", 0)
         return (
             f"Warehouse\n"
             f"  {files} arquivos exportados\n"
+            f"  fact_nutrient: {fact_records:,} registros\n"
             f"  {records:,} registros exportados"
         )
 

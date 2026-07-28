@@ -3,6 +3,7 @@ from __future__ import annotations
 import pandas as pd
 
 from app.normalization.engine import NormalizationEngine
+from app.normalization.rules import NORMALIZABLE_FIELDS
 from app.pipeline.metrics import PipelineMetricsCollector
 from app.pipeline.models import (
     PipelineConfig,
@@ -104,6 +105,18 @@ class PipelineOrchestrator:
             self.metrics.set_normalized(len(normalized_df))
             self.metrics.set_normalization_changes(normalization_report.auto_corrected_records)
 
+            # Quantifica somente valores que sobreviveram à normalização. Isso
+            # permite comparar diretamente o total mapeado pelo parser com o
+            # total entregue ao warehouse e detectar descartes prematuros.
+            normalized_fields = [
+                field for field in NORMALIZABLE_FIELDS if field in normalized_df.columns
+            ]
+            self.metrics.metrics.normalization_nutrients_output = (
+                int(normalized_df[normalized_fields].notna().sum().sum())
+                if normalized_fields
+                else 0
+            )
+
             semantic_df = self.semantic_engine.enrich_dataframe(normalized_df)
             self.metrics.set_enriched(len(semantic_df))
 
@@ -112,6 +125,9 @@ class PipelineOrchestrator:
             # ----------------------------------------------
 
             tables, exported = self.warehouse_pipeline.run(semantic_df)
+            fact_nutrient = tables.get("fact_nutrient", pd.DataFrame())
+            self.metrics.metrics.warehouse_fact_nutrient_records = len(fact_nutrient)
+            self.metrics.metrics.warehouse_records_exported = len(fact_nutrient)
             
             # v1.5.0: Geração do relatório de auditoria detalhado
             if "fact_nutrient" in tables:

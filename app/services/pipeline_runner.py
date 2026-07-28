@@ -161,7 +161,12 @@ class PipelineRunner:
 
                 # Popula métricas de warehouse
                 result.metrics.warehouse_files_exported = len(result.exported_files)
-                result.metrics.warehouse_records_exported = result.metrics.products_exported
+                # A métrica do warehouse deve refletir fatos persistidos, não
+                # produtos exportados; esses valores possuem granularidades
+                # distintas e sua confusão ocultaria regressões na fact_nutrient.
+                result.metrics.warehouse_records_exported = (
+                    result.metrics.warehouse_fact_nutrient_records
+                )
                 result.metrics.normalization_rules_applied = result.metrics.normalization_changes
 
             # 7. Computar throughput final
