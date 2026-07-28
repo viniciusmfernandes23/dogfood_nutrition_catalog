@@ -71,7 +71,12 @@ class PipelineMetrics:
     # ----------------------------------------------------------
     # Métricas de Parser (Sprint 2 — Observabilidade)
     # ----------------------------------------------------------
+    # ``found`` é mantido por compatibilidade e representa os nutrientes
+    # efetivamente mapeados para colunas canônicas.
     parser_nutrients_found: int = 0
+    parser_nutrients_parsed: int = 0
+    parser_nutrients_mapped: int = 0
+    parser_products_with_nutrients: int = 0
     parser_nutrients_missing: int = 0
     parser_success_rate: float = 0.0
 
@@ -80,12 +85,14 @@ class PipelineMetrics:
     # ----------------------------------------------------------
     normalization_rules_applied: int = 0
     normalization_discarded: int = 0
+    normalization_nutrients_output: int = 0
 
     # ----------------------------------------------------------
     # Métricas de Warehouse (Sprint 2 — Observabilidade)
     # ----------------------------------------------------------
     warehouse_files_exported: int = 0
     warehouse_records_exported: int = 0
+    warehouse_fact_nutrient_records: int = 0
 
     # ----------------------------------------------------------
     # Métricas de Pipeline (Sprint 2 — Observabilidade)
