@@ -81,6 +81,9 @@ collectors:
       - "ração cachorro filhote"
 
   petz:
-    # Placeholder para implementação futura
-    endpoint: ""
-    default_queries: []
+    # Endpoint base para buscas na Petz
+    endpoint: "https://www.petz.com.br"
+    default_queries:
+      - "ração cachorro premium"
+      - "ração cachorro adulto"
+      - "ração cachorro filhote"
