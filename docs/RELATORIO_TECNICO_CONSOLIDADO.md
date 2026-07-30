@@ -1,78 +1,113 @@
-# Relatório Técnico Consolidado: Dogfood Nutrition Catalog
-**Versão Atual do Pipeline:** v2.0.0
-**Data da Última Atualização:** 22 de Julho de 2026
+# Relatório Técnico Consolidado
+
+**Projeto:** Dog Food Nutrition Catalog  
+**Versão de referência:** v2.1.0  
+**Data de atualização:** 30 de julho de 2026
 
 ---
 
-## 1. Visão Geral do Projeto
+## 1. Resumo executivo
 
-O **Dogfood Nutrition Catalog** é um ecossistema automatizado para extração, normalização e armazenamento de dados nutricionais e comerciais de alimentos para cães. O projeto visa transformar informações brutas e inconsistentes de e-commerces em um Data Warehouse estruturado, confiável e pronto para análise em ferramentas de Business Intelligence (BI).
+O projeto implementa um fluxo automatizado para coleta, normalização, validação e exportação de dados nutricionais e comerciais de alimentos para cães. A proposta principal é transformar informações brutas de marketplaces em um conjunto estruturalmente confiável, com rastreabilidade e prontidão para análise em ferramentas de BI.
 
-### Objetivos Alcançados
-- **Integridade Biológica:** Garantir que todos os valores nutricionais reflitam a realidade biológica animal através de auditorias cruzadas.
-- **Normalização Universal:** Conversão de diversas unidades (%, mg/kg, kcal/g, UI/kg) para padrões canônicos de mercado.
-- **Prontidão para BI:** Exportação de dados limpos, modelados em Star Schema e com camada semântica amigável para o Power BI.
-- **Auditoria Forense:** Rastreabilidade completa do motivo de cada correção ou anulação de dado.
+O estado atual do repositório é de uma solução consolidada em termos de arquitetura, regras de normalização e fluxo operacional, com foco em robustez e documentação técnica.
 
 ---
 
-## 2. Arquitetura Técnica e Regras de Negócio
+## 2. Escopo e objetivos
 
-### 2.1. Motor de Normalização (`app/normalization`)
-O coração do sistema é o motor de normalização, que opera em três camadas de defesa:
-
-1.  **Resolver (Resolução Lógica):**
-    - Identifica unidades originais e aplica conversões determinísticas.
-    - Resolve erros de escala (10x, 100x) via heurísticas de plausibilidade.
-    - **Proteção Anti-Erro:** Rejeita unidades impossíveis (ex: Magnésio em `kcal/kg`).
-2.  **Engine (Auditoria Biológica Cruzada):**
-    - **Balanço de Massa:** Verifica se a soma de Proteína, Gordura, Fibra, Cinzas e Umidade está entre **600 e 1050 g/kg** (aplicado quando >= 4 macronutrientes estão presentes). Este limite inferior foi recalibrado para acomodar a presença de 25-40% de Carboidratos (NFE) típicos em rações secas.
-    - **Razão Ca:P:** Valida se a relação Cálcio/Fósforo está entre **1.0 e 2.0**.
-    - **Diferenciação por Categoria:** Petiscos e Suplementos possuem limites de micronutrientes flexibilizados em até **3x** e são isentos do balanço de massa proximal.
-3.  **Barreira de Sanidade Final (`exporter.py`):**
-    - Último filtro antes da escrita do arquivo físico.
-    - Anula valores que excedem limites físicos absolutos (ex: Proteína > 1000g/kg ou Energia > 4500kcal/kg).
-
-### 2.2. Modelagem de Dados (Star Schema)
-O Data Warehouse é exportado em formato CSV seguindo uma estrutura de dimensões e fatos:
-
-- **`dim_product`**: Cadastro de produtos. 
-    - *Nota:* Colunas de Score foram removidas para serem calculadas dinamicamente no Power BI, garantindo uma dimensão limpa.
-- **`fact_nutrient`**: Tabela fato no formato LONG.
-    - Contém: `product_id`, `nutrient_key`, `nutrient_value`, `status`, `reason`.
-    - Preserva o `reason` (motivo) para justificar anulações biológicas.
-- **`fact_price_snapshot`**: Histórico temporal de preços por SKU/Marketplace.
+Os objetivos do projeto são:
+- garantir integridade biológica e semântica dos dados nutricionais;
+- padronizar unidades e escalas para um formato comum;
+- preservar contexto de validação e correção para auditoria;
+- produzir dados estruturados para análise estratégica e visualização.
 
 ---
 
-## 3. Convenções de Unidades e Limites
+## 3. Arquitetura atual
 
-| Nutriente | Unidade Alvo | Faixa Plausível (Ração) |
-| :--- | :--- | :--- |
-| **Proteína** | `g/kg` | 0.1 - 600 |
-| **Gordura** | `g/kg` | 0.01 - 1000 |
-| **Cinzas** | `g/kg` | 10 - 150 |
-| **Cálcio (Min/Max)** | `mg/kg` | 100 - 60,000 |
-| **Energia** | `kcal/kg` | 500 - 4500 |
-| **Selênio** | `mg/kg` | 0.01 - 5 |
+### 3.1. Camada de ingestão
+Os módulos de ingestão estão concentrados em [app/collectors](app/collectors) e [app/services](app/services).
+
+Principais componentes:
+- [app/collectors/cobasi_api.py](app/collectors/cobasi_api.py): integração com a Cobasi.
+- [app/collectors/petlove_crawler.py](app/collectors/petlove_crawler.py): coletor de referência para a Petlove.
+- [app/collectors/petz_collector.py](app/collectors/petz_collector.py): coletor de referência para a Petz.
+- [app/services/collector_factory.py](app/services/collector_factory.py): fábrica de instâncias de collectors.
+- [app/services/collection_service.py](app/services/collection_service.py): coordenação da execução multi-marketplace.
+- [app/services/pipeline_runner.py](app/services/pipeline_runner.py): execução do fluxo completo.
+
+### 3.2. Camada de processamento e normalização
+A camada de processamento está localizada em [app/normalization](app/normalization), [app/parsers](app/parsers) e [app/semantic](app/semantic).
+
+Principais componentes:
+- [app/normalization/engine.py](app/normalization/engine.py): motor principal de normalização.
+- [app/normalization/resolver.py](app/normalization/resolver.py): resolução de unidades e escalas.
+- [app/normalization/validator.py](app/normalization/validator.py): validação de plausibilidade.
+- [app/parsers/nutrition_parser.py](app/parsers/nutrition_parser.py): parsing nutricional.
+- [app/semantic/classifier.py](app/semantic/classifier.py): classificação semântica de produtos.
+
+### 3.3. Camada de exportação e warehouse
+A camada de saída é responsável por consolidar os dados e gerar artefatos para análise.
+
+Principais componentes:
+- [app/warehouse](app/warehouse): exportação para modelos e tabelas analíticas.
+- [app/pipeline](app/pipeline): orquestração, métricas e relatórios.
 
 ---
 
-## 4. Histórico de Melhorias Recentes (Sprint de Estabilização)
+## 4. Regras de negócio e validações
 
-### v2.0.0 - Estabilização e Auditoria Biológica
-- **Recuperação de Dados Plausíveis:** Ajuste na regra de `invalid_conversion` para preservar valores reais (ex: Selênio 0.04 mg/kg) mesmo em casos de ambiguidade de unidade.
-- **Refinamento do Balanço de Massa:** Implementação de lógica condicional que exige 4 ou 5 macronutrientes para validar a soma, evitando anulações indevidas por dados parciais.
-- **Correção de Mapeamento:** Eliminação de bugs que atribuíam unidades de vitaminas a minerais.
-- **Remoção de Lógica de BI no ETL:** Exclusão das colunas de score da `dim_product`, delegando o cálculo para a camada de visualização.
-- **Rastreabilidade:** Inclusão do campo `reason` no CSV final para auditoria direta no Power BI.
+### 4.1. Normalização nutricional
+O motor atual valida e padroniza valores nutricionais por meio de:
+- conversão de unidades;
+- aplicação de regras biológicas e de plausibilidade;
+- auditoria cruzada entre nutrientes;
+- preservação do valor original e do contexto de correção.
+
+### 4.2. Validações críticas
+As validações principais incluem:
+- balanço de massa;
+- razão cálcio/fósforo;
+- limites biológicos para microminerais;
+- flexibilização de regras para categorias específicas, como petiscos e suplementos.
 
 ---
 
-## 5. Próximos Passos Recomendados
-1.  **Integração de Novos Marketplaces:** Expandir a coleta para Petz e outros varejistas utilizando a mesma base de normalização.
-2.  **Machine Learning para Classificação:** Utilizar modelos de NLP para refinar a classificação de `protein_source` e `clinical_category` com base na lista de ingredientes.
-3.  **Dashboard de Qualidade de Dados:** Criar uma visão no Power BI focada nos `sanity_audit_logs.csv` para monitorar a qualidade dos rótulos dos fabricantes.
+## 5. Situação atual das fontes de coleta
+
+### 5.1. Cobasi
+- fonte com melhor integração e execução consistente no fluxo principal.
+
+### 5.2. Petlove e Petz
+- a coleta de preços foi analisada e testada, mas não está validada como fluxo operacional estável;
+- os bloqueios observados são de natureza externa ao projeto e impactam a viabilidade da extração em tempo real.
+
+### 5.3. Implicação prática
+- o pipeline permanece funcional para o fluxo geral de ingestão e exportação;
+- a cobertura efetiva de preços para Petlove e Petz ainda depende de acesso autorizado, fontes alternativas ou estratégias específicas de bypass.
 
 ---
-**Relatório gerado automaticamente pelo pipeline de documentação.**
+
+## 6. Validação recente
+
+Os testes executados recentemente foram:
+- `pytest -q tests/test_petlove_petz_collectors.py` → 2 passed
+- `pytest -q tests/test_pipeline.py` → 12 passed
+
+Esses resultados indicam estabilidade da base funcional do projeto, embora com limitações de cobertura para certas fontes externas.
+
+---
+
+## 7. Recomendações de manutenção
+
+1. manter a documentação alinhada com o estado técnico real do projeto;
+2. priorizar mudanças com evidência operacional e testes;
+3. tratar bloqueios externos com transparência e sem sobreestimar a disponibilidade de dados;
+4. manter a branch principal como referência da versão consolidada do repositório.
+
+---
+
+## 8. Conclusão
+
+O projeto encontra-se em uma fase de consolidação técnica e documental, com uma arquitetura coerente, regras de normalização bem definidas e uma base operacional estável. O principal ponto de atenção hoje é a dependência de fontes externas para coleta de preços, e não a estrutura interna do pipeline.
