@@ -104,8 +104,8 @@ def run_extraction():
         "--marketplaces",
         type=str,
         nargs="+",
-        default=["Cobasi"],
-        help="Lista de marketplaces a coletar (padrão: Cobasi)",
+        default=["Cobasi", "Petlove", "Petz"],
+        help="Lista de marketplaces a coletar (padrão: Cobasi, Petlove, Petz)",
     )
     parser.add_argument(
         "--max-workers",

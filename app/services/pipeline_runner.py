@@ -72,7 +72,7 @@ class PipelineRunner:
 
         # Serviços
         self._collection = CollectionService(
-            marketplaces=marketplaces or ["Cobasi"],
+            marketplaces=marketplaces or ["Cobasi", "Petlove", "Petz"],
             collector_kwargs=collector_kwargs or {},
         )
         self._enrichment = ProductEnrichmentService()

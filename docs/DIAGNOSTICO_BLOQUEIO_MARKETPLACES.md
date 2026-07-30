@@ -1,6 +1,6 @@
 # Diagnóstico Técnico: Bloqueio de Coleta (Petlove & Petz)
 
-Este documento detalha o motivo pelo qual os dados da Petlove e da Petz não estão sendo capturados no pipeline, apesar de o código de extração estar 100% funcional.
+Este documento detalha o motivo pelo qual os dados da Petlove e da Petz não estão sendo capturados no pipeline, apesar de o código de extração estar estruturado e validado para múltiplas formas de resposta.
 
 ## 1. Status da Investigação
 Após a implementação de logs de diagnóstico verbosos, identificamos que ambos os marketplaces possuem proteções ativas contra coleta automatizada:

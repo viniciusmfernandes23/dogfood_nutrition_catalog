@@ -14,6 +14,8 @@ from typing import Any
 from app.collectors.cobasi_api import CobasiAPICollector
 from app.collectors.models import ProductCollection
 from app.collectors.petlove_crawler import PetloveCrawlerCollector
+from app.collectors.petz_collector import PetzCollector as PetzSourceCollector
+from app.core.config_loader import ConfigLoader
 from app.core.logging import logger
 
 
@@ -116,11 +118,8 @@ class PetloveCollector(BaseCollector):
         return "Petlove"
 
     def fetch_all(self, *args: Any, **kwargs: Any) -> list[ProductCollection]:
-        queries = kwargs.get("queries", [
-            "ração cachorro premium",
-            "ração cachorro adulto",
-            "ração cachorro filhote",
-        ])
+        config = ConfigLoader.load()
+        queries = kwargs.get("queries") or config.collectors.petlove.default_queries
         collector = PetloveCrawlerCollector()
         return collector.fetch_all(queries)
 
@@ -152,15 +151,18 @@ class PetloveCollector(BaseCollector):
 
 
 class PetzCollector(BaseCollector):
-    """Coletor da Petz (placeholder — implementação futura)."""
+    """Coletor da Petz integrado ao fluxo principal."""
 
     @property
     def marketplace(self) -> str:
         return "Petz"
 
     def fetch_all(self, *args: Any, **kwargs: Any) -> list[ProductCollection]:
-        logger.warning("PetzCollector: implementação pendente.")
-        return []
+        config = ConfigLoader.load()
+        queries = kwargs.get("queries") or config.collectors.petz.default_queries
+        categories = kwargs.get("categories") or []
+        collector = PetzSourceCollector()
+        return collector.fetch_all(queries=queries, categories=categories)
 
 
 # ----------------------------------------------------------
