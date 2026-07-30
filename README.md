@@ -22,6 +22,8 @@ A solução combina:
 - a coleta ativa de preços da Petlove e da Petz não está validada como fluxo operacional estável;
 - os bloqueios observados são externos às regras internas do projeto e exigem acesso autorizado ou fontes alternativas.
 
+> Observação: este repositório está em trabalho na branch `feat/coleta-precos-petlove-petz`, portanto parte da estrutura atual ainda reflete mudanças em progresso.
+
 ## Arquitetura do fluxo
 
 ```mermaid
@@ -67,7 +69,10 @@ app/                 # módulos principais do pipeline
 config/              # configuração YAML do pipeline
 data/                # dados intermediários e de saída
 output/              # relatórios e exports
+scripts/             # scripts de execução e validação
 docs/                # documentação técnica e análise
+  docs/reports/      # relatórios e análises em Markdown
+  docs/pbi/          # relatórios Power BI (.pbix)
 tests/               # testes unitários e de regressão
 ```
 
@@ -82,21 +87,21 @@ pip install -r app/requirements.txt
 ### 2. Executar o pipeline completo
 
 ```bash
-python executar_pipeline.py --mode full
+python scripts/executar_pipeline.py --mode full
 ```
 
 ### 3. Executar com marketplaces específicos
 
 ```bash
-python executar_pipeline.py --marketplaces Cobasi
+python scripts/executar_pipeline.py --marketplaces Cobasi
 ```
 
 ## Documentação principal
 
 - [docs/README.md](docs/README.md) — índice da documentação do projeto.
 - [docs/RELATORIO_TECNICO_CONSOLIDADO.md](docs/RELATORIO_TECNICO_CONSOLIDADO.md) — visão técnica consolidada.
-- [RELATORIO_REGRAS_NORMALIZACAO.md](RELATORIO_REGRAS_NORMALIZACAO.md) — regras de normalização e auditoria.
-- [ANALISE_COLETA_PRECOS_PETLOVE_PETZ.md](ANALISE_COLETA_PRECOS_PETLOVE_PETZ.md) — análise das limitações de coleta.
+- [docs/reports/RELATORIO_REGRAS_NORMALIZACAO.md](docs/reports/RELATORIO_REGRAS_NORMALIZACAO.md) — regras de normalização e auditoria.
+- [docs/reports/ANALISE_COLETA_PRECOS_PETLOVE_PETZ.md](docs/reports/ANALISE_COLETA_PRECOS_PETLOVE_PETZ.md) — análise das limitações de coleta.
 
 ## Validação recente
 

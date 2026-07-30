@@ -5,9 +5,16 @@ Esta pasta reúne os principais documentos técnicos, análises e relatórios do
 ## Índice
 
 - [RELATORIO_TECNICO_CONSOLIDADO.md](RELATORIO_TECNICO_CONSOLIDADO.md) — visão técnica consolidada do projeto.
-- [DIAGNOSTICO_BLOQUEIO_MARKETPLACES.md](DIAGNOSTICO_BLOQUEIO_MARKETPLACES.md) — diagnóstico dos bloqueios observados nas fontes de coleta.
-- [../RELATORIO_REGRAS_NORMALIZACAO.md](../RELATORIO_REGRAS_NORMALIZACAO.md) — regras de normalização e auditoria nutricional.
-- [../ANALISE_COLETA_PRECOS_PETLOVE_PETZ.md](../ANALISE_COLETA_PRECOS_PETLOVE_PETZ.md) — análise sobre Petlove e Petz.
+- [reports/DIAGNOSTICO_BLOQUEIO_MARKETPLACES.md](reports/DIAGNOSTICO_BLOQUEIO_MARKETPLACES.md) — diagnóstico dos bloqueios observados nas fontes de coleta.
+- [reports/RELATORIO_REGRAS_NORMALIZACAO.md](reports/RELATORIO_REGRAS_NORMALIZACAO.md) — regras de normalização e auditoria nutricional.
+- [reports/ANALISE_COLETA_PRECOS_PETLOVE_PETZ.md](reports/ANALISE_COLETA_PRECOS_PETLOVE_PETZ.md) — análise sobre Petlove e Petz.
+- [RELATORIO_TECNICO_CONSOLIDADO.md](RELATORIO_TECNICO_CONSOLIDADO.md) — visão técnica consolidada do projeto.
+- [pbi/](pbi/) — arquivos Power BI relacionados ao projeto.
+
+## Estrutura interna
+
+- `reports/`: relatórios e análise em Markdown.
+- `pbi/`: arquivos Power BI (.pbix) que documentam dashboards e modelos.
 
 ## Guia de uso
 
