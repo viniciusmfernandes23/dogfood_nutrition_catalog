@@ -31,6 +31,14 @@ def sample_dataframe() -> pd.DataFrame:
             "product_name": ["Ração Super Premium Frango"],
             "product_url": ["https://example.com"],
             "image_url": ["https://example.com/image.jpg"],
+            "ingredients": ["Farinha de frango, arroz integral"],
+            "rating_average": [4.8],
+            "rating_count": [8506],
+            "rating_1_star": [168],
+            "rating_2_star": [41],
+            "rating_3_star": [154],
+            "rating_4_star": [708],
+            "rating_5_star": [7435],
             "category": ["Ração Seca"],
             "product_category": ["Ração Seca"],
             "product_tier": ["Super Premium"],
@@ -99,6 +107,28 @@ def test_build_dim_product():
     assert (
         "product_name"
         in dim.columns
+    )
+
+    assert dim.loc[0, "ingredients"] == "Farinha de frango, arroz integral"
+    assert dim.loc[0, "rating_average"] == 4.8
+    assert dim.loc[0, "rating_count"] == 8506
+    assert dim.loc[0, "rating_5_star"] == 7435
+
+
+def test_build_dim_product_decodes_html_entities():
+    dataframe = pd.DataFrame(
+        {
+            "product_id": [2],
+            "product_name": [
+                "Ração N&amp;D Ocean Cães Filhotes Raças Pequenas Salmão e Melão"
+            ],
+        }
+    )
+
+    dim = ProductDimensionBuilder().build(dataframe)
+
+    assert dim.loc[0, "product_name"] == (
+        "Ração N&D Ocean Cães Filhotes Raças Pequenas Salmão e Melão"
     )
 
 

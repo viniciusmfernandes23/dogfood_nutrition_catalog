@@ -192,10 +192,16 @@ def parse_nutrition(
             # pois ela é sempre precedida por um dígito que o SEPARATOR não pode
             # consumir.
             NUMBER_EXT = r"(\d+(?:[.,]\d+)*)"
+            value_separator = SEPARATOR
+            if nutrient == "metabolizable_energy":
+                value_separator = (
+                    r"(?:\s*(?:\([^)]*\)|mín\.?|min\.?))?"
+                    r"\s*[:\-]?\s*"
+                )
             pattern = re.compile(
                 rf"{boundary}{pattern_str}{boundary}"
                 rf"[:\s]*"
-                rf"{SEPARATOR}"
+                rf"{value_separator}"
                 rf"{NUMBER_EXT}"
                 rf"\s*"
                 rf"{UNIT}",
@@ -228,6 +234,10 @@ def parse_nutrition(
                     unit = "kcal/kg"
                 elif unit in ["kcal/sachê", "kcal/sache"]:
                     unit = "kcal/sache"
+                elif unit in ["kcal/und", "kcal/unidade"]:
+                    # Energia por unidade não é comparável a kcal/kg sem o peso
+                    # individual; permanece fora do catálogo normalizado.
+                    continue
                 elif unit and ("mj" in unit and "kg" in unit):
                     unit = "mj/kg"
 
@@ -239,6 +249,22 @@ def parse_nutrition(
                     "start": match.start(),
                     "end": match.end(),
                     "full_text": match.group(0)
+                })
+
+        if nutrient == "metabolizable_energy":
+            for match in re.finditer(
+                rf"energia\s+metabolizável\s+kcal\s*/\s*kg\s*{NUMBER_EXT}",
+                text,
+                FLAGS,
+            ):
+                all_matches.append({
+                    "nutrient": nutrient,
+                    "value": clean_numeric_value(match.group(1)),
+                    "unit": "kcal/kg",
+                    "matched_alias": "energia metabolizável kcal/kg",
+                    "start": match.start(),
+                    "end": match.end(),
+                    "full_text": match.group(0),
                 })
 
     all_matches.sort(key=lambda x: (x["start"], -(x["end"] - x["start"])))

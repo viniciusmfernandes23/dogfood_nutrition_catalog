@@ -74,8 +74,6 @@ NUTRIENT_ALIASES = {
         "calcio minimo",
         r"cálcio\s*,\s*mín",
         r"calcio\s*,\s*min",
-        r"cálcio(?!\s*\(?máx)",
-        r"calcio(?!\s*\(?max)",
     ],
 
     "phosphorus": [
@@ -106,17 +104,16 @@ NUTRIENT_ALIASES = {
         r"potassio \(min\.?\)",
         r"potássio\s*,\s*mín",
         r"potassio\s*,\s*min",
-        "k",
     ],
 
     "metabolizable_energy": [
-        "energia metabolizável",
-        "energia metabolizavel",
+        r"energia\s+metabolizável(?!\s*\(?\s*mos\b)",
+        r"energia\s+metabolizavel(?!\s*\(?\s*mos\b)",
         "em",
         "valor energético",
         "valor energetico",
-        r"energia metabolizável \(mín\.?\)",
-        r"energia metabolizavel \(min\.?\)",
+        r"energia\s+metabolizável\s*\(mín\.?\)(?!\s*\(?\s*mos\b)",
+        r"energia\s+metabolizavel\s*\(min\.?\)(?!\s*\(?\s*mos\b)",
     ],
 
     # ------------------------------------------------------
@@ -183,12 +180,11 @@ NUTRIENT_ALIASES = {
     "magnesium": [
         "magnésio",
         "magnesio",
-        "mg",
     ],
     "chlorine": [
-        "cloro",
-        "cloreto",
-        "cl",
+        r"\bcloro\b",
+        r"\bcloreto\b",
+        r"\bcl\b",
     ],
     "iron": [
         "ferro",
@@ -307,6 +303,19 @@ NUTRIENT_ALIASES = {
     "mos": [
         "mananoligossacarídeos",
         "mananoligossacarideos",
-        "mos",
+        "mannan-oligossacarídeos",
+        "mannan-oligossacarideos",
+        "mannan-oligosaccharides",
+        r"\bmos\b",
+    ],
+    "fos": [
+        "frutooligossacarídeos",
+        "frutooligossacarideos",
+        "fructooligossacarídeos",
+        "fructooligossacarideos",
+        "fruto-oligossacarídeos",
+        "fruto-oligossacarideos",
+        "fructo-oligosaccharides",
+        r"\bfos\b",
     ],
 }

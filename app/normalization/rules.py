@@ -371,6 +371,13 @@ NORMALIZATION_RULES: dict[str, NormalizationRule] = {
         percent_factor=PERCENT_TO_MGKG_FACTOR,
         gkg_to_mgkg=True,
     ),
+    "fos_mgkg": NormalizationRule(
+        field="fos_mgkg",
+        target_min=100,
+        target_max=20000,
+        percent_factor=PERCENT_TO_MGKG_FACTOR,
+        gkg_to_mgkg=True,
+    ),
 }
 
 NORMALIZABLE_FIELDS = tuple(NORMALIZATION_RULES.keys())

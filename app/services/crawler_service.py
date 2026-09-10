@@ -82,6 +82,8 @@ class CrawlerService:
         start_time = time.time()
 
         guarantees = [None] * total
+        ingredients = [None] * total
+        ratings = [{} for _ in range(total)]
 
         with ThreadPoolExecutor(max_workers=self._max_workers) as executor:
             # Submete todas as tasks
@@ -98,6 +100,10 @@ class CrawlerService:
                     guarantees[index] = (
                         result.guarantee_section if result.success else None
                     )
+                    ingredients[index] = (
+                        result.ingredients_section if result.success else None
+                    )
+                    ratings[index] = result.ratings or {}
                     self._total_requests += 1
                     if result.success:
                         self._successful_requests += 1
@@ -105,6 +111,8 @@ class CrawlerService:
                         self._failed_requests += 1
                 except Exception as exc:
                     guarantees[index] = None
+                    ingredients[index] = None
+                    ratings[index] = {}
                     self._total_requests += 1
                     self._failed_requests += 1
 
@@ -122,6 +130,28 @@ class CrawlerService:
         avg_per_product = elapsed_time / total if total > 0 else 0
 
         df["raw_guarantee"] = guarantees
+        df["raw_ingredients"] = ingredients
+        for field in (
+            "rating_average",
+            "rating_count",
+            "rating_1_star",
+            "rating_2_star",
+            "rating_3_star",
+            "rating_4_star",
+            "rating_5_star",
+        ):
+            extracted = [item.get(field) for item in ratings]
+            if field in df.columns:
+                df[field] = [value if value is not None else existing for value, existing in zip(extracted, df[field])]
+            else:
+                df[field] = extracted
+        if "ingredients" in df.columns:
+            df["ingredients"] = [
+                extracted or existing
+                for extracted, existing in zip(ingredients, df["ingredients"])
+            ]
+        else:
+            df["ingredients"] = ingredients
 
         # Reportar métricas
         if self._metrics:

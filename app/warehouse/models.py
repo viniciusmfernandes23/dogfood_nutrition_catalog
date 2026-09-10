@@ -38,6 +38,14 @@ class ProductDimension(WarehouseModel):
     product_line: str | None = None
     is_transgenic: str | None = None
     image_url: str | None = None
+    ingredients: str | None = None
+    rating_average: float | None = None
+    rating_count: int | None = None
+    rating_1_star: int | None = None
+    rating_2_star: int | None = None
+    rating_3_star: int | None = None
+    rating_4_star: int | None = None
+    rating_5_star: int | None = None
     
     has_guarantee_levels: bool = False
     created_at: datetime = datetime.now()

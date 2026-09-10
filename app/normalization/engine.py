@@ -5,6 +5,8 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from dataclasses import replace
+import unicodedata
 
 from app.normalization.models import (
     DatasetNormalizationReport,
@@ -45,13 +47,41 @@ class NormalizationEngine:
         row_changed = False
 
         # Identifica categorias especiais que possuem limites biológicos diferenciados
-        product_category = str(row.get("product_category", "")).lower()
-        is_treat_or_supp = any(x in product_category for x in ["petisco", "snack", "suplemento", "complementar"])
+        product_category = unicodedata.normalize(
+            "NFKD", str(row.get("product_category", ""))
+        ).encode("ascii", "ignore").decode().lower()
+        is_treat_or_supp = any(
+            x in product_category
+            for x in [
+                "petisco",
+                "snack",
+                "suplemento",
+                "complementar",
+                "biscoito",
+                "biscoitos",
+                "cookie",
+                "cookies",
+            ]
+        )
+        is_wet_food = any(x in product_category for x in ["racao umida", "alimento umido", "wet food"])
+        product_name = unicodedata.normalize(
+            "NFKD", str(row.get("product_name", ""))
+        ).encode("ascii", "ignore").decode().lower()
+        is_therapeutic = any(
+            x in f"{product_category} {product_name}"
+            for x in ["renal", "prescription", "medicamentosa", "terapeutica", "veterinaria", "vet life"]
+        )
 
         for field in fields:
             rule = get_rule(field)
             if rule is None:
                 continue
+            if is_wet_food and field in {"fiber_gkg", "ash_gkg"}:
+                rule = replace(rule, target_min=0.0)
+            if is_wet_food and not field.endswith(("_gkg", "_kcalkg")):
+                rule = replace(rule, target_min=0.0)
+            if is_therapeutic and field == "lysine_mgkg":
+                rule = replace(rule, target_min=0.0)
 
             # Mapeamento dinâmico da coluna de unidade original
             original_unit = None
@@ -133,8 +163,36 @@ class NormalizationEngine:
         3. Razão Cálcio:Fósforo (Idealmente entre 1:1 e 2:1).
         4. Verificação de toxicidade/insignificância para microminerais.
         """
-        product_category = str(df.at[index, "product_category"]).lower() if "product_category" in df.columns else ""
-        is_treat_or_supp = any(x in product_category for x in ["petisco", "snack", "suplemento", "complementar"])
+        product_category = unicodedata.normalize(
+            "NFKD",
+            str(df.at[index, "product_category"])
+            if "product_category" in df.columns
+            else "",
+        ).encode("ascii", "ignore").decode().lower()
+        is_treat_or_supp = any(
+            x in product_category
+            for x in [
+                "petisco",
+                "snack",
+                "suplemento",
+                "complementar",
+                "biscoito",
+                "biscoitos",
+                "cookie",
+                "cookies",
+            ]
+        )
+        is_wet_food = any(x in product_category for x in ["racao umida", "alimento umido", "wet food"])
+        product_name = unicodedata.normalize(
+            "NFKD",
+            str(df.at[index, "product_name"])
+            if "product_name" in df.columns
+            else "",
+        ).encode("ascii", "ignore").decode().lower()
+        is_therapeutic = any(
+            x in f"{product_category} {product_name}"
+            for x in ["renal", "prescription", "medicamentosa", "terapeutica", "veterinaria", "vet life"]
+        )
 
         # Garante existência das colunas necessárias para o cálculo
         required_cols = [
@@ -158,7 +216,7 @@ class NormalizationEngine:
             present_macros = [m for m in macros_all if pd.notna(df.at[index, m])]
             
             # Aplica barreira se houver dados suficientes (>= 4 macros)
-            if len(present_macros) >= 4:
+            if "moisture_gkg" in present_macros and len(present_macros) >= 4:
                 macro_sum = float(sum(float(df.at[index, m]) for m in present_macros))
                 
                 # v1.4.0: RECALIBRAÇÃO CRÍTICA
@@ -169,15 +227,16 @@ class NormalizationEngine:
                 
                 # v1.5.6: RECALIBRAÇÃO CRÍTICA (Fiel ao Relatório v2.0.0)
                 # OK: 600–1050 g/kg (Acomoda carboidratos/NFE não declarados)
-                # REVIEW: 500–600 ou 1050–1100 g/kg
-                # FAILED: < 500 ou > 1100 g/kg
+                # REVIEW: 460–600 ou 1050–1100 g/kg
+                # FAILED: < 460 ou > 1100 g/kg
                 
                 status = ValidationStatus.NORMALIZED
                 reason = None
+                minimum_review_sum = 400 if is_therapeutic else 460
                 
                 if 600 <= macro_sum <= 1050:
                     status = ValidationStatus.NORMALIZED
-                elif (500 <= macro_sum < 600) or (1050 < macro_sum <= 1100):
+                elif (minimum_review_sum <= macro_sum < 600) or (1050 < macro_sum <= 1100):
                     status = ValidationStatus.REVIEW
                     reason = f"Mass balance audit required: {macro_sum}g/kg (Borderline/NFE)"
                 else:
@@ -204,7 +263,14 @@ class NormalizationEngine:
         ca_min_val = df.at[index, "calcium_min_mgkg"]
         ca_max_val = df.at[index, "calcium_max_mgkg"]
         
-        if pd.notna(p) and (pd.notna(ca_min_val) or pd.notna(ca_max_val)) and p > 0:
+        if (
+            not is_treat_or_supp
+            and not is_therapeutic
+            and not is_wet_food
+            and pd.notna(p)
+            and (pd.notna(ca_min_val) or pd.notna(ca_max_val))
+            and p > 0
+        ):
             ca = ca_min_val if pd.notna(ca_min_val) else ca_max_val
             ratio = ca / p
             if ratio < 1.0 or ratio > 2.0:
@@ -224,7 +290,9 @@ class NormalizationEngine:
                 val = df.at[index, mineral]
                 if pd.notna(val):
                     rule = get_rule(mineral)
-                    if rule and (val < rule.target_min or val > (rule.target_max * multiplier)):
+                    below_limit = not is_wet_food and val < rule.target_min if rule else False
+                    above_limit = rule and val > (rule.target_max * multiplier)
+                    if rule and (below_limit or above_limit):
                         print(f"[BIOLOGICAL AUDIT] Mineral fora da faixa: {mineral}={val}")
                         df.at[index, f"{mineral}_status"] = ValidationStatus.IMPLAUSIBLE
                         df.at[index, f"{mineral}_reason"] = f"Biological limit exceeded: {val}"

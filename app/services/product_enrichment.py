@@ -30,6 +30,7 @@ VTX_SPEC_MAP: dict[str, list[str]] = {
     "product_category": ["Seção", "customLabel2 Subcategoria", "customLabel1 Categoria"],
     "product_dept": ["Departamento", "customLabel0 Departamento"],
     "product_cat_vtex": ["Categoria"],
+    "ingredients": ["Ingredientes", "Ingredients", "Composição"],
 }
 
 
@@ -81,6 +82,7 @@ class ProductEnrichmentService:
             ),
             "available": any(v.get("available", False) for v in sku_variations),
             "image_url": image_url,
+            "ingredients": specifications.get("ingredients"),
             **specifications,
         }
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from html import unescape
 
 import pandas as pd
 
@@ -31,6 +32,14 @@ class ProductDimensionBuilder:
         "product_line",
         "is_transgenic",
         "image_url",
+        "ingredients",
+        "rating_average",
+        "rating_count",
+        "rating_1_star",
+        "rating_2_star",
+        "rating_3_star",
+        "rating_4_star",
+        "rating_5_star",
     )
 
     NUTRIENT_SUFFIXES = (
@@ -65,7 +74,9 @@ class ProductDimensionBuilder:
             # v1.5.4: Sanitização de quebras de linha para evitar corrupção do CSV
             def clean_text(val):
                 if isinstance(val, str):
-                    return val.replace("\n", " ").replace("\r", " ").replace("\t", " ").strip()
+                    return unescape(
+                        val.replace("\n", " ").replace("\r", " ").replace("\t", " ").strip()
+                    )
                 return val
 
             records.append(
@@ -88,6 +99,14 @@ class ProductDimensionBuilder:
                     product_line=clean_text(row.get("product_line")),
                     is_transgenic=clean_text(row.get("is_transgenic")),
                     image_url=clean_text(row.get("image_url")),
+                    ingredients=clean_text(row.get("ingredients") or row.get("raw_ingredients")),
+                    rating_average=row.get("rating_average"),
+                    rating_count=row.get("rating_count"),
+                    rating_1_star=row.get("rating_1_star"),
+                    rating_2_star=row.get("rating_2_star"),
+                    rating_3_star=row.get("rating_3_star"),
+                    rating_4_star=row.get("rating_4_star"),
+                    rating_5_star=row.get("rating_5_star"),
                     has_guarantee_levels=self._has_guarantee_levels(row),
                     created_at=self.timestamp,
                     updated_at=self.timestamp,

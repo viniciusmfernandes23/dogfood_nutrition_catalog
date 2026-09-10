@@ -6,7 +6,11 @@ import httpx
 
 from app.collectors.http_client import HttpClient
 from app.core.logging import logger
-from app.parsers.html_parser import extract_guarantee_section
+from app.parsers.html_parser import (
+    extract_guarantee_section,
+    extract_ingredients_section,
+    extract_product_ratings,
+)
 
 
 @dataclass(slots=True)
@@ -20,6 +24,8 @@ class CrawlResult:
 
     html: str | None
     guarantee_section: str | None
+    ingredients_section: str | None = None
+    ratings: dict[str, float | int | None] | None = None
 
     error: str | None = None
 
@@ -77,10 +83,14 @@ class CobasiCrawler:
                     success=False,
                     html=None,
                     guarantee_section=None,
+                    ingredients_section=None,
+                    ratings=None,
                     error="invalid_page",
                 )
 
             guarantee = extract_guarantee_section(html)
+            ingredients = extract_ingredients_section(html)
+            ratings = extract_product_ratings(html)
 
             if guarantee is None:
 
@@ -99,6 +109,8 @@ class CobasiCrawler:
                 success=True,
                 html=html,
                 guarantee_section=guarantee,
+                ingredients_section=ingredients,
+                ratings=ratings,
             )
 
         except httpx.HTTPError as exc:
@@ -114,6 +126,8 @@ class CobasiCrawler:
                 success=False,
                 html=None,
                 guarantee_section=None,
+                ingredients_section=None,
+                ratings=None,
                 error=str(exc),
             )
 
@@ -129,6 +143,8 @@ class CobasiCrawler:
                 success=False,
                 html=None,
                 guarantee_section=None,
+                ingredients_section=None,
+                ratings=None,
                 error=str(exc),
             )
 

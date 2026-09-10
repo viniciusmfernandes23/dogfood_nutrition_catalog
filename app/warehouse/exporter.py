@@ -182,9 +182,21 @@ class WarehouseExporter:
                     if col in dataframe.columns:
                         dataframe[col] = dataframe[col].astype(str).str.strip()
 
-                # Garante que as colunas sejam idênticas para evitar deslocamento
-                common_cols = [c for c in existing_df.columns if c in dataframe.columns]
-                combined_df = pd.concat([existing_df[common_cols], dataframe[common_cols]], ignore_index=True)
+                # A dimensão pode ganhar colunas em novas versões do pipeline.
+                # Mantemos o histórico e incluímos as novas métricas com nulos
+                # nos registros antigos.
+                if filename == "dim_product.csv":
+                    all_cols = list(existing_df.columns) + [
+                        column for column in dataframe.columns
+                        if column not in existing_df.columns
+                    ]
+                    combined_df = pd.concat(
+                        [existing_df.reindex(columns=all_cols), dataframe.reindex(columns=all_cols)],
+                        ignore_index=True,
+                    )
+                else:
+                    common_cols = [c for c in existing_df.columns if c in dataframe.columns]
+                    combined_df = pd.concat([existing_df[common_cols], dataframe[common_cols]], ignore_index=True)
                 
                 # Deduplicação inteligente baseada no tipo de dado
                 if filename == "fact_price_snapshot.csv" and "collected_at" in combined_df.columns:

@@ -70,6 +70,7 @@ class NutrientFactBuilder:
         # Outros
         "beta_glucans_mgkg",
         "mos_mgkg",
+        "fos_mgkg",
     )
 
     def __init__(
