@@ -84,6 +84,7 @@ class CrawlerService:
         guarantees = [None] * total
         ingredients = [None] * total
         ratings = [{} for _ in range(total)]
+        comments = [[] for _ in range(total)]
 
         with ThreadPoolExecutor(max_workers=self._max_workers) as executor:
             # Submete todas as tasks
@@ -104,6 +105,7 @@ class CrawlerService:
                         result.ingredients_section if result.success else None
                     )
                     ratings[index] = result.ratings or {}
+                    comments[index] = result.comments or []
                     self._total_requests += 1
                     if result.success:
                         self._successful_requests += 1
@@ -113,6 +115,7 @@ class CrawlerService:
                     guarantees[index] = None
                     ingredients[index] = None
                     ratings[index] = {}
+                    comments[index] = []
                     self._total_requests += 1
                     self._failed_requests += 1
 
@@ -131,6 +134,7 @@ class CrawlerService:
 
         df["raw_guarantee"] = guarantees
         df["raw_ingredients"] = ingredients
+        df["product_comments"] = comments
         for field in (
             "rating_average",
             "rating_count",

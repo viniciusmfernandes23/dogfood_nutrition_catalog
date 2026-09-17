@@ -61,6 +61,7 @@ class WarehousePostProcessor:
             "dim_product.csv",
             "fact_nutrient.csv",
             "fact_price_snapshot.csv",
+            "fact_product_review.csv",
             "sanity_audit_logs.csv",
         ]
 

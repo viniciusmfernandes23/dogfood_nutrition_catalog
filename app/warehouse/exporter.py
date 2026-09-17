@@ -49,7 +49,10 @@ class WarehouseExporter:
         Exporta tabelas fato. 
         Apenas o histórico de preços é incremental; dados nutricionais são sobrescritos.
         """
-        is_incremental = (filename == "fact_price_snapshot.csv")
+        is_incremental = filename in {
+            "fact_price_snapshot.csv",
+            "fact_product_review.csv",
+        }
         return self._export_csv(
             dataframe,
             filename,
@@ -62,6 +65,7 @@ class WarehouseExporter:
         dim_product: pd.DataFrame,
         fact_nutrient: pd.DataFrame,
         fact_price_snapshot: pd.DataFrame,
+        fact_product_review: pd.DataFrame | None = None,
     ) -> dict[str, Path]:
         """
         Orquestra a exportação de todas as tabelas do warehouse.
@@ -74,6 +78,10 @@ class WarehouseExporter:
             "dim_nutrient_reference": self._export_csv(dim_nutrient_ref, "dim_nutrient_reference.csv", append=False),
             "fact_nutrient": self.export_fact(fact_nutrient, "fact_nutrient.csv"),
             "fact_price_snapshot": self.export_fact(fact_price_snapshot, "fact_price_snapshot.csv"),
+            "fact_product_review": self.export_fact(
+                fact_product_review if fact_product_review is not None else pd.DataFrame(),
+                "fact_product_review.csv",
+            ),
         }
         
         if self.sanity_logs:
@@ -210,6 +218,8 @@ class WarehouseExporter:
                     combined_df = combined_df.drop(columns=["_date_only", "collected_at_dt"])
                 else:
                     subset = ["product_id"]
+                    if filename == "fact_product_review.csv" and "comment" in combined_df.columns:
+                        subset.append("comment")
                     for col in ["collected_at", "nutrient_key"]:
                         if col in combined_df.columns:
                             subset.append(col)
@@ -230,6 +240,8 @@ class WarehouseExporter:
             return ["product_id", "nutrient_key", "nutrient_value", "nutrient_unit", "original_value", "original_unit", "status", "rule_applied", "collected_at", "reason"]
         elif "fact_price" in filename:
             return ["product_id", "marketplace", "ean", "sku_id", "sku_name", "package_weight_kg", "price", "list_price", "subscriber_price", "price_per_kg", "available", "collected_at"]
+        elif "fact_product_review" in filename:
+            return ["product_id", "comment"]
         elif "dim_product" in filename:
             from app.warehouse.dim_product import ProductDimensionBuilder
             return list(ProductDimensionBuilder.DEFAULT_COLUMNS) + ["has_guarantee_levels", "created_at", "updated_at"]

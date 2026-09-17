@@ -6,6 +6,7 @@ from app.parsers.nutrition_parser import (
 )
 from app.parsers.html_parser import (
     extract_ingredients_section,
+    extract_product_comments,
     extract_product_ratings,
     extract_guarantee_section,
 )
@@ -99,6 +100,33 @@ def test_extract_product_ratings_from_next_data():
                 "rating_4_star": 708,
                 "rating_5_star": 7435,
         }
+
+
+def test_extract_product_comments_from_next_data():
+    html = """
+    <script id="__NEXT_DATA__" type="application/json">
+    {"props":{"pageProps":{"productDetail":{"reviews":[
+        {"comment":" Muito bom para o meu cachorro. "},
+        {"reviewText":"Entrega rápida"},
+        {"comment":"Muito bom para o meu cachorro."}
+    ]}}}}
+    </script>
+    """
+
+    assert extract_product_comments(html) == [
+        "Muito bom para o meu cachorro.",
+        "Entrega rápida",
+    ]
+
+
+def test_extract_product_comments_from_json_ld():
+    html = """
+    <script type="application/ld+json">
+    {"review":[{"reviewBody":"Comentário vindo do schema."}]}
+    </script>
+    """
+
+    assert extract_product_comments(html) == ["Comentário vindo do schema."]
 
 
 def test_parse_value_fat():

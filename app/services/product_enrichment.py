@@ -83,6 +83,7 @@ class ProductEnrichmentService:
             "available": any(v.get("available", False) for v in sku_variations),
             "image_url": image_url,
             "ingredients": specifications.get("ingredients"),
+            "product_comments": [],
             **specifications,
         }
 

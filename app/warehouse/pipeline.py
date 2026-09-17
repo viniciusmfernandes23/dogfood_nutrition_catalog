@@ -8,6 +8,7 @@ import pandas as pd
 from app.warehouse.dim_product import ProductDimensionBuilder
 from app.warehouse.exporter import WarehouseExporter
 from app.warehouse.fact_nutrient import NutrientFactBuilder
+from app.warehouse.fact_product_review import ProductReviewFactBuilder
 from app.warehouse.fact_price_snapshot import (
     PriceSnapshotFactBuilder,
 )
@@ -32,6 +33,8 @@ class WarehousePipeline:
         self.nutrient_builder = NutrientFactBuilder(timestamp=self.timestamp)
 
         self.price_builder = PriceSnapshotFactBuilder(timestamp=self.timestamp)
+
+        self.review_builder = ProductReviewFactBuilder()
 
         self.exporter = WarehouseExporter(
             output_dir=output_dir,
@@ -63,6 +66,11 @@ class WarehousePipeline:
                     dataframe,
                 ),
 
+            "fact_product_review":
+                self.review_builder.build(
+                    dataframe,
+                ),
+
         }
 
     # ==========================================================
@@ -82,6 +90,10 @@ class WarehousePipeline:
 
             fact_price_snapshot=tables[
                 "fact_price_snapshot"
+            ],
+
+            fact_product_review=tables[
+                "fact_product_review"
             ],
 
         )

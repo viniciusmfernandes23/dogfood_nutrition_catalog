@@ -280,3 +280,75 @@ def extract_product_ratings(html: str | None) -> dict[str, float | int | None]:
         return empty
 
     return empty
+
+
+def extract_product_comments(html: str | None) -> list[str]:
+    """Extrai textos de comentários de avaliações presentes na página."""
+    if not html:
+        return []
+
+    soup = BeautifulSoup(html, "html.parser")
+    comments: list[str] = []
+
+    def add_comment(value: object) -> None:
+        if not isinstance(value, str):
+            return
+        comment = " ".join(value.split())
+        if comment and comment not in comments:
+            comments.append(comment)
+
+    def collect_review_values(value: object) -> None:
+        if isinstance(value, str):
+            add_comment(value)
+            return
+        if isinstance(value, list):
+            for item in value:
+                collect_review_values(item)
+            return
+        if not isinstance(value, dict):
+            return
+
+        for key in (
+            "comment",
+            "text",
+            "body",
+            "content",
+            "reviewText",
+            "reviewBody",
+        ):
+            add_comment(value.get(key))
+
+    def find_review_collections(value: object) -> None:
+        if isinstance(value, dict):
+            for key, nested in value.items():
+                normalized_key = str(key).lower()
+                if normalized_key in {
+                    "reviews",
+                    "review",
+                    "customerreviews",
+                    "reviewlist",
+                    "userreviews",
+                    "comments",
+                }:
+                    collect_review_values(nested)
+                find_review_collections(nested)
+        elif isinstance(value, list):
+            for nested in value:
+                find_review_collections(nested)
+
+    for script in soup.find_all("script"):
+        script_text = script.string or script.get_text()
+        if not script_text or "review" not in script_text.lower():
+            continue
+        try:
+            find_review_collections(json.loads(script_text))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+
+    for element in soup.select(
+        '[data-review-text], [data-testid*="review"], .review-text, .review-comment'
+    ):
+        add_comment(element.get("data-review-text"))
+        add_comment(element.get_text(" ", strip=True))
+
+    return comments
