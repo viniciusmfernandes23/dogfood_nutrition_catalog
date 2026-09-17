@@ -20,8 +20,10 @@ import os
 
 import pandas as pd
 
-# Garantir que o diretório do projeto está no path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Garantir que a raiz do projeto está no path para importar o pacote `app`
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 # ----------------------------------------------------------
 # Funções de compatibilidade (usadas por testes existentes)

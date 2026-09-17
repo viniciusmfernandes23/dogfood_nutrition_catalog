@@ -3,8 +3,10 @@ import os
 import pandas as pd
 from datetime import datetime
 
-# Ajusta path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Ajusta path para permitir importação do pacote `app` a partir da raiz do projeto
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 from app.warehouse.fact_price_snapshot import PriceSnapshotFactBuilder
 from app.warehouse.exporter import WarehouseExporter

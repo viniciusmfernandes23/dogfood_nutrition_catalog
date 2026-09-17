@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arquitetura de Dados — Visão Executiva</title>
+    <style>
+      :root {
+        --bg: #edf3fa;
+        --panel: #f7f9fc;
+        --line: #dfeaf7;
+        --text: #163a5b;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: var(--bg);
+        font-family: "Segoe UI", Arial, sans-serif;
+      }
+      .frame {
+        width: min(96vw, 1700px);
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        box-shadow: 0 18px 30px rgba(18, 58, 93, 0.08);
+        padding: 18px;
+      }
+      img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="frame">
+      <img src="./arquitetura_dados_projeto_stakeholders.svg" alt="Arquitetura de dados do projeto em visão executiva para stakeholders" />
+    </div>
+  </body>
+</html>

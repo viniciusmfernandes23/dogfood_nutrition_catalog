@@ -1,0 +1,89 @@
+nutrient_key,fase_vida,nutriente_nome,categoria,unidade,peso_score,minimo_dm,maximo_dm,tipo_limite_maximo,ajustar_por_energia
+protein_gkg,Adulto,Proteína,Macronutriente,g/kg,10,180,,Nutricional,TRUE
+fat_gkg,Adulto,Gordura total,Macronutriente,g/kg,8,55,,Nutricional,TRUE
+fiber_gkg,Adulto,Fibra bruta,Macronutriente,g/kg,3,,,Optativo,FALSE
+omega_6_mgkg,Adulto,Ácido linoleico (ômega 6),Ácido graxo,mg/kg,6,13200,65000,Nutricional,TRUE
+omega_3_mgkg,Adulto,Ácidos graxos ômega 3,Ácido graxo,mg/kg,6,800,,Nutricional,TRUE
+epa_dha_mgkg,Adulto,EPA + DHA,Ácido graxo,mg/kg,7,500,,Nutricional,TRUE
+calcium_min_mgkg,Adulto,Cálcio (mínimo),Macromineral,mg/kg,9,5000,25000,Nutricional,TRUE
+calcium_max_mgkg,Adulto,Cálcio (máximo),Macromineral,mg/kg,5,5000,25000,Nutricional,TRUE
+phosphorus_mgkg,Adulto,Fósforo,Macromineral,mg/kg,9,4000,16000,Nutricional,TRUE
+chlorine_mgkg,Adulto,Cloro,Macromineral,mg/kg,4,1500,,Nutricional,TRUE
+sodium_mgkg,Adulto,Sódio,Macromineral,mg/kg,4,1000,,Nutricional,TRUE
+potassium_mgkg,Adulto,Potássio,Macromineral,mg/kg,4,5000,,Nutricional,TRUE
+magnesium_mgkg,Adulto,Magnésio,Macromineral,mg/kg,5,700,,Nutricional,TRUE
+iron_mgkg,Adulto,Ferro,Micromineral,mg/kg,4,36,681.8,Legal,TRUE
+copper_mgkg,Adulto,Cobre,Micromineral,mg/kg,4,7.2,28,Legal,TRUE
+zinc_mgkg,Adulto,Zinco,Micromineral,mg/kg,4,72,227,Legal,TRUE
+manganese_mgkg,Adulto,Manganês,Micromineral,mg/kg,3,5.8,170,Legal,TRUE
+iodine_mgkg,Adulto,Iodo,Micromineral,mg/kg,4,1.1,11,Legal,TRUE
+selenium_mgkg,Adulto,Selênio,Micromineral,mg/kg,4,0.18,0.568,Legal,TRUE
+vitamin_a_uikg,Adulto,Vitamina A,Vitamina,IU/kg,4,6060,400000,Nutricional,TRUE
+vitamin_d3_uikg,Adulto,Vitamina D3,Vitamina,IU/kg,4,552,3200,Nutricional,TRUE
+vitamin_e_uikg,Adulto,Vitamina E,Vitamina,IU/kg,4,36,,Nutricional,TRUE
+vitamin_b1_mgkg,Adulto,Vitamina B1 (tiamina),Vitamina,mg/kg,3,2.1,,Nutricional,TRUE
+vitamin_b2_mgkg,Adulto,Vitamina B2 (riboflavina),Vitamina,mg/kg,3,6,,Nutricional,TRUE
+vitamin_b6_mgkg,Adulto,Vitamina B6,Vitamina,mg/kg,3,1.5,,Nutricional,TRUE
+niacin_mgkg,Adulto,Niacina (B3),Vitamina,mg/kg,3,16.4,,Nutricional,TRUE
+pantothenic_acid_mgkg,Adulto,Ácido pantotênico (B5),Vitamina,mg/kg,3,14.2,,Nutricional,TRUE
+biotin_mgkg,Adulto,Biotina,Vitamina,mg/kg,2,,,Optativo,TRUE
+folic_acid_mgkg,Adulto,Ácido fólico,Vitamina,mg/kg,3,0.258,,Nutricional,TRUE
+vitamin_b12_mgkg,Adulto,Vitamina B12,Vitamina,mg/kg,3,0.0335,,Nutricional,TRUE
+vitamin_c_mgkg,Adulto,Vitamina C,Vitamina,mg/kg,1,,,Optativo,TRUE
+vitamin_k3_mgkg,Adulto,Vitamina K3,Vitamina,mg/kg,2,,,Optativo,TRUE
+choline_mgkg,Adulto,Colina,Composto relacionado,mg/kg,4,1640,,Nutricional,TRUE
+taurine_mgkg,Adulto,Taurina,Aminoácido,mg/kg,6,,,Optativo,TRUE
+arginine_mgkg,Adulto,Arginina,Aminoácido,mg/kg,6,5200,,Nutricional,TRUE
+lysine_mgkg,Adulto,Lisina,Aminoácido,mg/kg,5,4200,28000,Nutricional,TRUE
+methionine_mgkg,Adulto,Metionina,Aminoácido,mg/kg,5,4000,,Nutricional,TRUE
+tryptophan_mgkg,Adulto,Triptofano,Aminoácido,mg/kg,4,1700,,Nutricional,TRUE
+l_carnitine_mgkg,Adulto,L-carnitina,Funcional,mg/kg,1,,,Optativo,FALSE
+beta_glucans_mgkg,Adulto,Beta-glucanas,Funcional,mg/kg,1,,,Optativo,FALSE
+mos_mgkg,Adulto,MOS (mananoligossacarídeos),Funcional,mg/kg,1,,,Optativo,FALSE
+ash_gkg,Adulto,Cinzas,Proxy,g/kg,1,,,Proxy,FALSE
+moisture_gkg,Adulto,Umidade,Proxy,g/kg,1,,,Proxy,FALSE
+metabolizable_energy_kcalkg,Adulto,Energia metabolizável,Energia,kcal/kg,10,,,Base,FALSE
+protein_gkg,Filhote,Proteína,Macronutriente,g/kg,10,250,,Nutricional,TRUE
+fat_gkg,Filhote,Gordura total,Macronutriente,g/kg,8,85,,Nutricional,TRUE
+fiber_gkg,Filhote,Fibra bruta,Macronutriente,g/kg,3,,,Optativo,FALSE
+omega_6_mgkg,Filhote,Ácido linoleico (ômega 6),Ácido graxo,mg/kg,7,13000,65000,Nutricional,TRUE
+omega_3_mgkg,Filhote,Ácidos graxos ômega 3,Ácido graxo,mg/kg,7,800,,Nutricional,TRUE
+epa_dha_mgkg,Filhote,EPA + DHA,Ácido graxo,mg/kg,8,500,,Nutricional,TRUE
+calcium_min_mgkg,Filhote,Cálcio (mínimo),Macromineral,mg/kg,10,10000,16000,Nutricional,TRUE
+calcium_max_mgkg,Filhote,Cálcio (máximo),Macromineral,mg/kg,6,8000,18000,Nutricional,TRUE
+phosphorus_mgkg,Filhote,Fósforo,Macromineral,mg/kg,10,9000,,Nutricional,TRUE
+chlorine_mgkg,Filhote,Cloro,Macromineral,mg/kg,5,3300,,Nutricional,TRUE
+sodium_mgkg,Filhote,Sódio,Macromineral,mg/kg,5,2200,,Nutricional,TRUE
+potassium_mgkg,Filhote,Potássio,Macromineral,mg/kg,5,4400,,Nutricional,TRUE
+magnesium_mgkg,Filhote,Magnésio,Macromineral,mg/kg,6,400,,Nutricional,TRUE
+iron_mgkg,Filhote,Ferro,Micromineral,mg/kg,5,88,681.8,Legal,TRUE
+copper_mgkg,Filhote,Cobre,Micromineral,mg/kg,5,11,28,Legal,TRUE
+zinc_mgkg,Filhote,Zinco,Micromineral,mg/kg,5,100,227,Legal,TRUE
+manganese_mgkg,Filhote,Manganês,Micromineral,mg/kg,4,5.8,170,Legal,TRUE
+iodine_mgkg,Filhote,Iodo,Micromineral,mg/kg,5,1.5,11,Legal,TRUE
+selenium_mgkg,Filhote,Selênio,Micromineral,mg/kg,5,0.4,0.568,Legal,TRUE
+vitamin_a_uikg,Filhote,Vitamina A,Vitamina,IU/kg,5,5000,400000,Nutricional,TRUE
+vitamin_d3_uikg,Filhote,Vitamina D3,Vitamina,IU/kg,5,552,3200,Nutricional,TRUE
+vitamin_e_uikg,Filhote,Vitamina E,Vitamina,IU/kg,4,50,,Nutricional,TRUE
+vitamin_b1_mgkg,Filhote,Vitamina B1 (tiamina),Vitamina,mg/kg,3,1.8,,Nutricional,TRUE
+vitamin_b2_mgkg,Filhote,Vitamina B2 (riboflavina),Vitamina,mg/kg,3,4.2,,Nutricional,TRUE
+vitamin_b6_mgkg,Filhote,Vitamina B6,Vitamina,mg/kg,3,1.2,,Nutricional,TRUE
+niacin_mgkg,Filhote,Niacina (B3),Vitamina,mg/kg,3,13.6,,Nutricional,TRUE
+pantothenic_acid_mgkg,Filhote,Ácido pantotênico (B5),Vitamina,mg/kg,3,12,,Nutricional,TRUE
+biotin_mgkg,Filhote,Biotina,Vitamina,mg/kg,2,,,Optativo,TRUE
+folic_acid_mgkg,Filhote,Ácido fólico,Vitamina,mg/kg,3,0.216,,Nutricional,TRUE
+vitamin_b12_mgkg,Filhote,Vitamina B12,Vitamina,mg/kg,3,0.028,,Nutricional,TRUE
+vitamin_c_mgkg,Filhote,Vitamina C,Vitamina,mg/kg,1,,,Optativo,TRUE
+vitamin_k3_mgkg,Filhote,Vitamina K3,Vitamina,mg/kg,2,,,Optativo,TRUE
+choline_mgkg,Filhote,Colina,Composto relacionado,mg/kg,4,1700,,Nutricional,TRUE
+taurine_mgkg,Filhote,Taurina,Aminoácido,mg/kg,7,,,Optativo,TRUE
+arginine_mgkg,Filhote,Arginina,Aminoácido,mg/kg,7,8200,,Nutricional,TRUE
+lysine_mgkg,Filhote,Lisina,Aminoácido,mg/kg,6,8800,28000,Nutricional,TRUE
+methionine_mgkg,Filhote,Metionina,Aminoácido,mg/kg,6,3500,,Nutricional,TRUE
+tryptophan_mgkg,Filhote,Triptofano,Aminoácido,mg/kg,5,2300,,Nutricional,TRUE
+l_carnitine_mgkg,Filhote,L-carnitina,Funcional,mg/kg,1,,,Optativo,FALSE
+beta_glucans_mgkg,Filhote,Beta-glucanas,Funcional,mg/kg,1,,,Optativo,FALSE
+mos_mgkg,Filhote,MOS (mananoligossacarídeos),Funcional,mg/kg,1,,,Optativo,FALSE
+ash_gkg,Filhote,Cinzas,Proxy,g/kg,1,,,Proxy,FALSE
+moisture_gkg,Filhote,Umidade,Proxy,g/kg,1,,,Proxy,FALSE
+metabolizable_energy_kcalkg,Filhote,Energia metabolizável,Energia,kcal/kg,10,,,Base,FALSE

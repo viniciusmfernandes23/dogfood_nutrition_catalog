@@ -26,34 +26,47 @@ A solução combina:
 
 ## Arquitetura do fluxo
 
+A solução foi estruturada para transformar dados heterogêneos de marketplaces em informações confiáveis, analíticas e prontas para decisão de negócio. O fluxo segue a lógica de camada de valor do dado: bruto, tratado e analítico.
+
 ```mermaid
-flowchart TD
-    A[Configuração e entrada] --> B[Collectors / Ingestão]
-    B --> C[Parsing e Enrichment]
-    C --> D[Normalization Engine]
-    D --> E[Validation & Audit]
-    E --> F[Warehouse / Export]
-    F --> G[Relatórios e métricas]
-    G --> H[BI / Analytics]
+flowchart LR
+    A[Marketplaces e-commerce<br/>Cobasi • Petlove • Petz] --> B[Bronze<br/>Dados brutos coletados]
+    B --> C[Prata<br/>Tratamento, padronização,<br/>normalização e validação]
+    C --> D[Ouro<br/>Dados analíticos estruturados]
+    D --> E[Power BI<br/>Power Query • Modelo semântico • DAX • Dashboards]
+    E --> F[Análise estratégica<br/>Comparação e decisão]
 
-    B --> B1[Cobasi]
-    B --> B2[Petlove]
-    B --> B3[Petz]
+    subgraph IA[IA transversal]
+        I[Assistência em desenvolvimento,<br/>validação e revisão]
+    end
 
-    C --> C1[Extratores HTML/JSON]
-    C --> C2[Modelos de produto]
+    I -. apoio adicional .-> B
+    I -. apoio adicional .-> C
+    I -. apoio adicional .-> E
 
-    D --> D1[Conversão de unidades]
-    D --> D2[Regras biológicas]
+    classDef bronze fill:#fff3e6,stroke:#d98f52,color:#1e2e42,stroke-width:1.5px;
+    classDef silver fill:#eafaf6,stroke:#3b9c90,color:#1e2e42,stroke-width:1.5px;
+    classDef gold fill:#fff7d6,stroke:#c9a72a,color:#1e2e42,stroke-width:1.5px;
+    classDef bi fill:#123a5d,stroke:#123a5d,color:#ffffff,stroke-width:1.5px;
+    classDef source fill:#eef4ff,stroke:#6a8fc0,color:#1e2e42,stroke-width:1.5px;
+    classDef decision fill:#edf3ff,stroke:#6478d5,color:#1e2e42,stroke-width:1.5px;
+    classDef ia fill:#f3f0ff,stroke:#7a6ef3,color:#1e2e42,stroke-width:1.5px;
 
-    E --> E1[Balanço de massa]
-    E --> E2[Ca:P ratio]
-    E --> E3[Microminerais]
-
-    F --> F1[dim_product]
-    F --> F2[fact_nutrient]
-    F --> F3[fact_price_snapshot]
+    class A source;
+    class B bronze;
+    class C silver;
+    class D gold;
+    class E bi;
+    class F decision;
+    class I ia;
 ```
+
+### Interpretação executiva
+- Bronze representa o dado bruto e heterogêneo, ainda em forma de coleta e ingestão original.
+- Prata representa o dado confiável, tratado, padronizado, normalizado e submetido a validações de plausibilidade e qualidade.
+- Ouro representa o dado analítico, já estruturado para consumo e decisão.
+- Power BI consolida esse valor em modelos semânticos, cálculos DAX e dashboards de análise e comparação.
+- A IA atua como apoio transversal ao desenvolvimento, validação e revisão, e não como etapa automática do pipeline.
 
 ## Estrutura do repositório
 

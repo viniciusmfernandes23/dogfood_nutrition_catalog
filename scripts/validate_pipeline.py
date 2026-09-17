@@ -4,7 +4,11 @@ Verifica que o bug de multiplicação ×10 está corrigido em todos os estágios
 """
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# Ajusta path para permitir importação do pacote `app` a partir da raiz do projeto
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 import pandas as pd
 from app.parsers.nutrition_parser import parse_nutrition, parse_value, clean_numeric_value
